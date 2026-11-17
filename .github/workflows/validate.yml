@@ -1,0 +1,58 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version and changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check version and changelog
+        run: .github/scripts/check_version.sh
+      - name: Version must be new when it changed
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(.github/scripts/check_version.sh)
+          base=$(git show "origin/${{ github.base_ref }}:custom_components/advanced_google_contacts/manifest.json" | jq -r .version)
+          if [ "$version" != "$base" ] && gh release view "v$version" >/dev/null 2>&1; then
+            echo "::error::Release v$version already exists, bump the version in manifest.json"
+            exit 1
+          fi
+
+  python:
+    name: Python syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m compileall -q custom_components
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Brand images ship locally in custom_components/.../brand (HA 2026.3+).
+          ignore: brands

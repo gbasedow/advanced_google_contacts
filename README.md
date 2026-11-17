@@ -18,6 +18,17 @@ Die Integration verbindet Home Assistant per OAuth2 mit der **Google People API*
 2. „Advanced Google Contacts“ herunterladen und Home Assistant neu starten.
 3. *Einstellungen → Geräte & Dienste → Integration hinzufügen → Advanced Google Contacts*.
 
+## Neue Version veröffentlichen
+
+1. In `custom_components/advanced_google_contacts/manifest.json` die `version` erhöhen (Format `X.Y.Z`).
+2. Im Changelog `custom_components/advanced_google_contacts/README.md` einen Abschnitt `## X.Y.Z – …` ergänzen. Sein Text wird zum Release-Text.
+3. Nach `main` bringen, direkt oder per Pull Request.
+
+Die Action **Release** legt dann automatisch den Release `vX.Y.Z` an, und HACS bietet das Update an.
+Sie bricht ab, wenn der Changelog-Abschnitt fehlt oder die Version niedriger ist als der letzte Release.
+Gibt es den Release schon, tut sie nichts. Manuell lässt sie sich über *Actions → Release → Run workflow* starten.
+Die Action **Validate** prüft bei jedem Push und Pull Request die Version, den Changelog, die Python-Syntax, hassfest und die HACS-Struktur.
+
 ## Umstieg von `google_contacts_basedog` (≤ 4.7) auf `advanced_google_contacts` (0.1)
 
 Durch die neue Domain ist es für Home Assistant eine **neue Integration**. Der alte Eintrag wird nicht übernommen.

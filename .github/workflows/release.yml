@@ -1,32 +1,34 @@
 name: Release
 
-# Creates a GitHub release (and tag v<version>) whenever the version in
-# manifest.json on main has no release yet. Can also be started manually.
+# Publishes release v<version> when the version in manifest.json on main has
+# no release yet. Runs on every push to main that touches the integration and
+# can be started manually (Actions -> Release -> Run workflow).
 on:
   push:
     branches: [main]
     paths:
-      - custom_components/advanced_google_contacts/manifest.json
+      - custom_components/advanced_google_contacts/**
       - .github/workflows/release.yml
+      - .github/scripts/check_version.sh
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read version from manifest.json
+      - name: Check version and changelog
         id: version
-        run: |
-          version=$(jq -r .version custom_components/advanced_google_contacts/manifest.json)
-          if [ -z "$version" ] || [ "$version" = "null" ]; then
-            echo "::error::No version in manifest.json"; exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(.github/scripts/check_version.sh)" >> "$GITHUB_OUTPUT"
 
       - name: Create release if missing
         env:
@@ -38,13 +40,24 @@ jobs:
             echo "Release $tag already exists, nothing to do."
             exit 0
           fi
-          # Release notes: section "## <version> ..." from the integration changelog.
+
+          # Refuse to publish a version lower than the newest existing release.
+          latest=$(gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' \
+                   | sed 's/^v//' | sort -V | tail -n1)
+          if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]; then
+            echo "::error::Version $VERSION is lower than the latest release $latest"
+            exit 1
+          fi
+
+          # Release notes: section "## <version> ..." of the integration changelog.
           awk -v v="$VERSION" '
-            /^## / { if (found) exit; if (index($0, "## " v " ") == 1) { found=1; next } }
+            /^## / { if (found) exit; if ($0 == "## " v || index($0, "## " v " ") == 1) { found=1; next } }
             found { print }
           ' custom_components/advanced_google_contacts/README.md > notes.md
-          [ -s notes.md ] || echo "Advanced Google Contacts $VERSION" > notes.md
+
           gh release create "$tag" \
             --target "$GITHUB_SHA" \
             --title "Advanced Google Contacts $VERSION" \
-            --notes-file notes.md
+            --notes-file notes.md \
+            --latest
+          echo "Published $tag"
