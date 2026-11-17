@@ -1,0 +1,68 @@
+# Google Contacts Basedog (Home Assistant Custom Integration)
+
+Domain: `google_contacts_basedog` · Version: 4.7.0 · Quelle: aus der laufenden HA-Installation übernommen (`/config/custom_components/google_contacts_basedog`).
+
+## Zweck
+
+Die Integration verbindet Home Assistant per OAuth2 mit der **Google People API** (nur Lesezugriff auf Kontakte) und bietet zwei Funktionen:
+
+1. **Geburtstags-Sync** (Dienst `google_contacts_basedog.sync_birthdays_from_google_contacts`):
+   Die Geburtstage aller Kontakte werden als ganztägige Termine in einen beschreibbaren HA-Kalender geschrieben.
+2. **Kontakt-Entitäten** (optional): Für jeden Kontakt entsteht ein Gerät mit einem Sensor pro befülltem Kontaktfeld.
+
+## Einrichtung
+
+- Voraussetzungen: `application_credentials` (Google OAuth-Client vom Typ „Webanwendung“, People API aktiviert, Redirect-URI `https://my.home-assistant.io/redirect/oauth`) und `calendar`.
+- Scopes: `contacts.readonly openid email`, mit `access_type=offline` und `prompt=consent`, damit ein Refresh-Token ausgestellt wird.
+- Es ist nur **ein** Konto erlaubt (`single_instance_allowed`).
+- Beim Start wird die E-Mail-Adresse des Kontos über OpenID UserInfo ermittelt und als Titel des Eintrags gesetzt. Bei 401/403 startet HA automatisch die Reauthentifizierung (`ConfigEntryAuthFailed`).
+- Option `create_contact_entities` (Standard im Code: ein): Eine Änderung lädt den Eintrag neu (`OptionsFlowWithReload`).
+
+## Aufbau
+
+| Datei | Aufgabe |
+|---|---|
+| `manifest.json` | Metadaten, Abhängigkeiten `application_credentials` und `calendar`, `cloud_polling` |
+| `const.py` | OAuth-/API-URLs, abgefragte `personFields`, Feldliste und deutsche Feldnamen für die Entitäten |
+| `application_credentials.py` | Google-Autorisierungs- und Token-Endpunkt |
+| `config_flow.py` | OAuth2-Flow, Reauth und Options-Flow (Kontakt-Entitäten ein/aus) |
+| `api.py` | `account_email()` über UserInfo; `contacts()` lädt alle Kontakte seitenweise (1000 pro Seite) und überspringt gelöschte. Ergebnis: Dict `resourceName → Kontakt` mit `display_name`. |
+| `coordinator.py` | `DataUpdateCoordinator`, Abruf alle **30 Minuten**; 401/403 → Reauth, andere Fehler → `UpdateFailed` |
+| `__init__.py` | Setup und Unload, Registrierung des Dienstes, Aufräumen der Registry, wenn Entitäten deaktiviert sind |
+| `sensor.py` | Ein Gerät pro Kontakt, ein Sensor pro befülltem Feld (der Name immer). Zustand = erster Wert (max. 255 Zeichen), Attribut `values` = alle Rohwerte. Neue Kontakte werden dynamisch ergänzt. |
+| `birthday_sync.py` | Logik des Geburtstags-Syncs (siehe unten) |
+| `services.yaml`, `strings.json`, `translations/` | Dienstbeschreibung und UI-Texte (de/en) |
+
+## Ablauf des Geburtstags-Syncs
+
+Parameter: `calendar` (`calendar.*`, muss Termine anlegen können; zum Aufräumen auch löschen) und `months` (1–120).
+
+1. Prüfen, ob der Kalender existiert und `CREATE_EVENT` unterstützt. Dann die Kontakte neu anfordern.
+2. **Soll-Liste** für den Zeitraum heute bis heute + `months` erstellen. Schlüssel ist *(Anzeigename, Datum)*, der Titel lautet
+   `Geburtstag <Name> - <Alter>`, bzw. `Geburtstag <Name>`, wenn das Geburtsjahr fehlt.
+   Wer am 29.02. Geburtstag hat, bekommt den Termin in Nicht-Schaltjahren am 28.02.
+3. **Anlegen:** Termine aus der Soll-Liste, die im Kalender noch nicht exakt so stehen, werden angelegt
+   (ganztägig, Beschreibung „Synchronisiert aus Google Contacts Basedog“).
+4. **Kontrolllesen:** Fehlt danach ein Soll-Termin, bricht der Sync ab, **ohne etwas zu löschen**.
+5. **Aufräumen:** Jeder Termin im Zeitraum, dessen Titel zum Muster `^Geburtstag <Name>( - <Zahl>)?$` passt und
+   nicht genau einem Soll-Termin entspricht, wird über seine UID gelöscht. Das betrifft Duplikate, veraltete Alter und umbenannte oder gelöschte Kontakte.
+6. **Abschlussprüfung:** Jeder Soll-Termin muss genau einmal vorhanden sein.
+7. Rückgabe: `{desired, created, deleted, unchanged}`.
+
+Im Einsatz: Die Automation „Geburtstage in Kalender eintragen“ läuft täglich um 01:00 mit `calendar.geburtstage` und `months: 24`.
+
+## Hinweise aus der Code-Analyse (noch nicht umgesetzt)
+
+- **Veraltete Registry-API** (`__init__.py`, `_remove_contact_registry_entries`): `device_registry.devices.values()` ist
+  laut HA-Log ab **2027.9.0** nicht mehr nutzbar. Ersatz: `dr.async_entries_for_config_entry(device_registry, entry.entry_id)`,
+  analog `er.async_entries_for_config_entry(...)` für Entitäten.
+- **Eigener Kalender empfohlen:** Der Sync löscht im Zeitraum *jeden* Termin, der wie `Geburtstag <Name>` aussieht und
+  nicht zur Soll-Liste passt, auch von Hand angelegte Einträge.
+- **Identität = Anzeigename:** Haben zwei Kontakte denselben Namen und denselben Geburtstag, entsteht nur ein Termin.
+  Liefert Google für einen Kontakt mehrere Geburtstagsangaben (z. B. einmal mit und einmal ohne Jahr), gewinnt die zuletzt gelesene.
+  Der Titel mit Alter ist also nicht garantiert.
+- **Veraltete Daten:** `async_request_refresh()` wirft bei einem Fehler keine Exception. Schlägt der Abruf fehl, arbeitet
+  der Sync mit den zuletzt erfolgreich geladenen Kontakten. Eine Prüfung von `coordinator.last_update_success` wäre sinnvoll.
+- **Gelöschte Kontakte** hinterlassen bei aktivierten Entitäten Sensoren, die auf „nicht verfügbar“ stehen. Ihre Geräte werden nicht automatisch entfernt.
+- `translations/en.json`: Der Text für `single_instance_allowed` ist noch deutsch.
+- `manifest.json`: `codeowners` ist leer, `documentation` zeigt auf die Google-Dokumentation. Für HACS fehlen `issue_tracker` und `hacs.json`.

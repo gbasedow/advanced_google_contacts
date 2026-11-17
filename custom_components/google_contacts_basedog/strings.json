@@ -1,0 +1,32 @@
+{
+  "title": "Google Contacts Basedog",
+  "config": {
+    "step": {
+      "reauth_confirm": {
+        "title": "Google-Konto erneut authentifizieren",
+        "description": "Die Berechtigung muss erneuert werden, damit die Integration zusätzlich die E-Mail-Adresse des angemeldeten Google-Kontos lesen kann. Deine bestehende Integration und Optionen bleiben erhalten."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Es kann nur ein Konto eingerichtet werden.",
+      "reauth_successful": "Google-Konto wurde erfolgreich erneut authentifiziert."
+    }
+  },
+  "application_credentials": {
+    "description": "Google OAuth-2.0-Webanwendung; People API aktivieren; Redirect URI https://my.home-assistant.io/redirect/oauth"
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Kontakt-Entitäten",
+        "description": "Lege fest, ob für jeden Google-Kontakt ein Gerät mit Entitäten angelegt wird. Die Geburtstags-Sync-Aktion bleibt unabhängig davon verfügbar.",
+        "data": {
+          "create_contact_entities": "Entitäten für Kontakte anlegen"
+        },
+        "data_description": {
+          "create_contact_entities": "Aus: Es werden keine Kontakt-Geräte/-Entitäten angelegt; der Geburtstags-Sync bleibt verfügbar."
+        }
+      }
+    }
+  }
+}
