@@ -60,11 +60,34 @@ async def test_shrinking_range_leaves_stale_entries(hass, setup_integration, goo
     assert not [t for t in titles if "Weg X" in t], titles
 
 
-async def test_edited_description_makes_entry_unmanaged(hass, setup_integration, local_calendar):
-    """Documented behaviour: an entry whose description was edited is no longer managed (a new one is created)."""
+async def test_notes_below_marker_keep_entry_managed(hass, setup_integration, local_calendar):
+    """Notes added below the first line keep the entry managed; a changed first line makes it unmanaged."""
     from .conftest import add_calendar_event
     await add_calendar_event(hass, local_calendar, "Geburtstag Anna Muster - 37", "2027-03-10", MARKER + "\nNotiz")
+    await add_calendar_event(hass, local_calendar, "Geburtstag Anna Muster - 37", "2027-03-10", "Meine Notiz\n" + MARKER)
     await setup_integration([person("1", "Anna Muster", birthday=(1990, 3, 10))], create_contact_entities=False)
     res = await sync(hass)
-    assert res["created"] == 1  # duplicate in the calendar
-    assert len(await calendar_events(hass, local_calendar)) == 2
+    assert res == {"desired": 1, "created": 0, "deleted": 0, "unchanged": 1}
+    assert len(await calendar_events(hass, local_calendar)) == 2  # the second one is not ours
+
+
+async def test_create_only_calendar_without_changes_works(hass, setup_integration):
+    """A calendar without delete support is fine as long as nothing must be deleted."""
+    await setup_integration([person("1", "Anna Muster", birthday=(1990, 3, 10))], create_contact_entities=False)
+    cal = CreateOnlyCal()
+    comp = MagicMock(); comp.get_entity.return_value = cal
+    hass.data[DATA_COMPONENT] = comp
+    from custom_components.advanced_google_contacts.calendar_sync import sync_events
+    coord = next(iter(hass.data["advanced_google_contacts"].values()))
+    fmt = {"birthday": "Geburtstag {name}[ - {age}]", "event": "{type} {name}"}
+    assert (await sync_events(hass, coord, "calendar.x", 12, ["birthday"], fmt))["created"] == 1
+    assert (await sync_events(hass, coord, "calendar.x", 12, ["birthday"], fmt))["unchanged"] == 1
+
+
+@pytest.mark.parametrize("start,months,expected", [
+    ("2027-01-31", 1, "2027-02-28"), ("2028-01-31", 1, "2028-02-29"), ("2026-11-17", 2, "2027-01-17"),
+    ("2026-12-31", 12, "2027-12-31"), ("2026-08-31", 6, "2027-02-28"), ("2026-11-17", 120, "2036-11-17"),
+])
+def test_add_months(start, months, expected):
+    from custom_components.advanced_google_contacts.calendar_sync import add_months
+    assert add_months(dt.date.fromisoformat(start), months) == dt.date.fromisoformat(expected)

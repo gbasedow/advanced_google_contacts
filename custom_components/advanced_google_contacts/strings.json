@@ -9,7 +9,10 @@
     },
     "abort": {
       "single_instance_allowed": "Es kann nur ein Konto eingerichtet werden.",
-      "reauth_successful": "Google-Konto wurde erfolgreich erneut authentifiziert."
+      "reauth_successful": "Google-Konto wurde erfolgreich erneut authentifiziert.",
+      "wrong_account": "Falsches Google-Konto. Bitte mit dem Konto anmelden, das ursprünglich eingerichtet wurde.",
+      "cannot_connect": "Verbindung zu Google fehlgeschlagen. Bitte später erneut versuchen.",
+      "already_configured": "Dieses Google-Konto ist bereits eingerichtet."
     }
   },
   "application_credentials": {

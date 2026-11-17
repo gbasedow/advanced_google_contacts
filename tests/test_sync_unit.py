@@ -38,7 +38,7 @@ async def test_manual_entries_untouched_and_idempotent(hass):
 
 async def test_event_types_and_scope(hass):
     cal = FakeCal(); setup_cal(hass, cal)
-    a, w, o, b = nxt(3, 10), nxt(6, 1), nxt(7, 2), nxt(8, 3)
+    a, w, o = nxt(3, 10), nxt(6, 1), nxt(7, 2)
     coord = FakeCoord({"1": contact("Anna", (1990, 3, 10), events=[
         ("anniversary", (2010, 6, 1)), ("Hochzeitstag", (2012, 7, 2)), ("other", (None, 8, 3))])})
     res = await run(hass, coord, ["birthday", "anniversary", "custom", "other"])

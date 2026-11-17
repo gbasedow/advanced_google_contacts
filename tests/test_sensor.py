@@ -83,10 +83,14 @@ async def test_renamed_contact_updates_device_name(hass, setup_integration, goog
     assert "A Neu" in states_by_device(hass, entry)
 
 
-async def test_attribute_size_large_contact(hass, setup_integration):
-    """Attributes larger than the recorder limit (16 KiB) are not stored in history."""
-    import json
+async def test_values_attribute_not_recorded(hass, recorder_mock, setup_integration):
+    """The raw 'values' attribute stays live but is excluded from the recorder."""
+    from homeassistant.components.recorder.history import get_significant_states
+    from pytest_homeassistant_custom_component.components.recorder.common import async_wait_recording_done
     big = [{"value": f"+49 {i:010d}", "type": "mobile", "formattedType": "Mobil"} for i in range(400)]
     entry = await setup_integration([person("1", "A B", phoneNumbers=big)], create_contact_entities=True)
-    st = states_by_device(hass, entry)["A B"]["Telefon"][1]
-    assert len(json.dumps(dict(st.attributes))) < 16384
+    ent_id, st = states_by_device(hass, entry)["A B"]["Telefon"]
+    assert len(st.attributes["values"]) == 400
+    await async_wait_recording_done(hass)
+    hist = await hass.async_add_executor_job(get_significant_states, hass, dt_util.utcnow() - timedelta(hours=1), None, [ent_id])
+    assert hist[ent_id] and "values" not in hist[ent_id][-1].attributes

@@ -1,17 +1,18 @@
 """Synchronize birthdays and other contact events into a writable HA calendar.
 
-Every created entry carries a marker in its description. Only entries with a
-marker of a selected event type are compared, deduplicated or deleted; all
-other entries in the calendar are never touched. An entry is identified by
-(date, title, event type), so changing the title format replaces the entries.
+Every created entry carries a marker in the first line of its description.
+Only entries with a marker of a selected event type are compared, deduplicated
+or deleted; all other entries in the calendar are never touched. An entry is
+identified by (date, title, event type), so changing the title format replaces
+the entries. Managed entries beyond the requested range are removed too (up to
+MAX_MONTHS ahead), so "months" strictly limits how far ahead entries exist.
 """
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import logging
 from typing import Any
-
-from dateutil.relativedelta import relativedelta
 
 from homeassistant.components.calendar import DATA_COMPONENT, CalendarEntity, CalendarEntityFeature
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -35,6 +36,8 @@ _LOGGER = logging.getLogger(__name__)
 MARKER = "Synchronisiert aus Advanced Google Contacts"
 LEGACY_MARKERS = ("Synchronisiert aus Google Contacts Basedog",)
 CUSTOM_PREFIX = f"{EVENT_TYPE_CUSTOM}:"
+MAX_MONTHS = 120
+BUILTIN_SELECTORS = (EVENT_TYPE_BIRTHDAY, EVENT_TYPE_ANNIVERSARY, EVENT_TYPE_OTHER, EVENT_TYPE_CUSTOM, EVENT_TYPE_ALL)
 
 Key = tuple[dt.date, str, str]  # (date, title, event type key)
 
@@ -43,9 +46,20 @@ def marker_for(type_key: str) -> str:
     return MARKER if type_key == EVENT_TYPE_BIRTHDAY else f"{MARKER} [{type_key}]"
 
 
+def add_months(date: dt.date, months: int) -> dt.date:
+    """date + months; the day is clamped to the last day of the target month."""
+    index = date.month - 1 + months
+    year, month = date.year + index // 12, index % 12 + 1
+    return dt.date(year, month, min(date.day, calendar.monthrange(year, month)[1]))
+
+
 def managed_type(event) -> str | None:
-    """Event type key of an entry created by this sync, else None."""
-    description = (getattr(event, "description", None) or "").strip()
+    """Event type key of an entry created by this sync, else None.
+
+    Only the first line counts, so notes added below it keep the entry managed.
+    """
+    lines = (getattr(event, "description", None) or "").strip().splitlines()
+    description = lines[0].strip() if lines else ""
     if description == MARKER or description in LEGACY_MARKERS:
         return EVENT_TYPE_BIRTHDAY
     prefix = f"{MARKER} ["
@@ -71,7 +85,13 @@ def type_label(type_key: str) -> str:
 
 
 def normalize_selection(event_types) -> frozenset[str]:
-    selected = {str(t).strip() for t in event_types if str(t).strip()}
+    """Strip values; built-in selectors are matched case-insensitively."""
+    builtins = {b.casefold(): b for b in BUILTIN_SELECTORS}
+    selected = set()
+    for raw in event_types:
+        value = str(raw).strip()
+        if value:
+            selected.add(builtins.get(value.casefold(), value))
     if not selected:
         raise HomeAssistantError("Kalender-Sync: Es wurde kein Ereignistyp ausgewählt.")
     return frozenset(selected)
@@ -166,6 +186,17 @@ def desired_events(
     return desired
 
 
+def unmatched_labels(contacts: dict[str, dict[str, Any]], selected: frozenset[str]) -> list[str]:
+    """Selected own event labels that no contact uses (likely typos)."""
+    labels = {
+        event_type_key(raw)[len(CUSTOM_PREFIX):].casefold()
+        for contact in contacts.values()
+        for raw in contact.get("events") or []
+        if isinstance(raw, dict) and event_type_key(raw).startswith(CUSTOM_PREFIX)
+    }
+    return sorted(s for s in selected if s not in BUILTIN_SELECTORS and s.casefold() not in labels)
+
+
 async def _read(cal: CalendarEntity, hass, start: dt.date, end: dt.date):
     start_dt = dt_util.start_of_local_day(start)
     end_dt = dt_util.start_of_local_day(end + dt.timedelta(days=1))
@@ -223,12 +254,39 @@ async def sync_events(
     coordinator.async_set_updated_data(contacts)
 
     today = dt_util.now().date()
-    range_end = today + relativedelta(months=months)
+    range_end = add_months(today, months)
+    # Read further ahead than the range, so managed entries beyond it are cleaned up.
+    read_end = add_months(today, max(months, MAX_MONTHS))
     desired = desired_events(contacts, today, range_end, selected, formats)
     wanted: set[Key] = {(date, title, key) for (date, title), key in desired.items()}
+    unmatched = unmatched_labels(contacts, selected)
+    if unmatched:
+        _LOGGER.warning("Kalender-Sync: Ereignistypen ohne passenden Kontakt (Tippfehler?): %s", ", ".join(unmatched))
+
+    # Pre-check: if stale entries exist, the calendar must be able to delete them.
+    # Checked before creating anything, so a create-only calendar gets no duplicates.
+    seen: set[Key] = set()
+    stale = []
+    existing: set[Key] = set()
+    for key, event in _managed(await _read(cal, hass, today, read_end), selected):
+        existing.add(key)
+        if key in wanted and key not in seen:
+            seen.add(key)
+        else:
+            stale.append(event)
+    if stale:
+        if not features & CalendarEntityFeature.DELETE_EVENT:
+            raise HomeAssistantError(
+                f"Kalender-Sync: {len(stale)} veraltete oder doppelte Einträge müssten gelöscht werden, "
+                "aber der gewählte Kalender unterstützt das Löschen über Home Assistant nicht. Es wurde nichts geändert."
+            )
+        if any(not event.uid for event in stale):
+            raise HomeAssistantError(
+                "Kalender-Sync: Veraltete Einträge können nicht sicher gelöscht werden, weil der Kalender keine UID liefert. "
+                "Es wurde nichts geändert."
+            )
 
     # Phase 1: create missing entries. Nothing is deleted before all creates succeed.
-    existing = {key for key, _event in _managed(await _read(cal, hass, today, range_end), selected)}
     created = 0
     for date, title, key in sorted(wanted, key=lambda k: (k[0], k[1].casefold())):
         if (date, title, key) in existing:
@@ -250,7 +308,7 @@ async def sync_events(
     # Phase 2: re-read; every wanted entry must be visible before anything is deleted.
     kept: set[Key] = set()
     to_delete = []
-    for key, event in _managed(await _read(cal, hass, today, range_end), selected):
+    for key, event in _managed(await _read(cal, hass, today, read_end), selected):
         if key in wanted and key not in kept:
             kept.add(key)
         else:
@@ -287,7 +345,7 @@ async def sync_events(
 
     # Final verification: exactly one entry per wanted key.
     counts: dict[Key, int] = {}
-    for key, _event in _managed(await _read(cal, hass, today, range_end), selected):
+    for key, _event in _managed(await _read(cal, hass, today, read_end), selected):
         counts[key] = counts.get(key, 0) + 1
     problems = [
         f"{title} ({date.isoformat()}): {counts.get((date, title, key), 0)} Treffer"
@@ -307,4 +365,7 @@ async def sync_events(
         "Calendar sync complete: calendar=%s types=%s desired=%d created=%d deleted=%d unchanged=%d",
         calendar_entity_id, sorted(selected), len(wanted), created, deleted, unchanged,
     )
-    return {"desired": len(wanted), "created": created, "deleted": deleted, "unchanged": unchanged}
+    result: dict[str, Any] = {"desired": len(wanted), "created": created, "deleted": deleted, "unchanged": unchanged}
+    if unmatched:
+        result["unmatched_types"] = unmatched
+    return result

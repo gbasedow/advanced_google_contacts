@@ -76,15 +76,18 @@ async def test_event_types_scopes(hass, setup_integration, local_calendar):
     assert len(await calendar_events(hass, local_calendar)) == 4
 
 
-async def test_unknown_or_miscased_type_is_rejected(hass, setup_integration, local_calendar):
-    """Expected: a typo like 'Birthday' or 'anniversaries' is reported instead of silently syncing nothing."""
-    await setup_integration([person("1", "Anna Muster", birthday=(1990, 3, 10))], create_contact_entities=False)
-    with pytest.raises((HomeAssistantError, vol.Invalid)):
-        await sync(hass, event_types=["Birthday"])
+async def test_miscased_builtin_type_and_unknown_label(hass, setup_integration, local_calendar):
+    """Built-in types are case-insensitive; an own label used by no contact is reported (no abort)."""
+    await setup_integration([person("1", "Anna Muster", birthday=(1990, 3, 10), events=[("Hochzeitstag", (2012, 7, 2))])],
+                            create_contact_entities=False)
+    res = await sync(hass, event_types=["Birthday", "Hochzeitstagg"])
+    assert res["created"] == 1
+    assert res["unmatched_types"] == ["Hochzeitstagg"]
+    assert "unmatched_types" not in await sync(hass, event_types=["BIRTHDAY", "hochzeitstag"])
 
 
 async def test_title_format_option_and_override(hass, setup_integration, local_calendar):
-    entry = await setup_integration([person("1", "Anna Muster", birthday=(1990, 3, 10))],
+    await setup_integration([person("1", "Anna Muster", birthday=(1990, 3, 10))],
                                     create_contact_entities=False, title_format_birthday="🎂 {first_name}[ ({age})]")
     await sync(hass)
     assert [t for _d, t, _x in await calendar_events(hass, local_calendar)] == ["🎂 Anna (37)"]

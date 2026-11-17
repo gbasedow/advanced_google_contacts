@@ -2,7 +2,7 @@
 
 <img src="custom_components/advanced_google_contacts/brand/icon.png" width="96" alt="Logo">
 
-Domain: `advanced_google_contacts` · Version: 0.3.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
+Domain: `advanced_google_contacts` · Version: 0.4.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
 
 ## Zweck
 
@@ -25,7 +25,7 @@ Parameter:
 | Parameter | Pflicht | Bedeutung |
 |---|---|---|
 | `calendar` | ja | Zielkalender (`calendar.*`), muss Termine anlegen und zum Aufräumen löschen können |
-| `months` | ja | Zeitraum ab heute in Monaten (1–120) |
+| `months` | ja | Zeitraum ab heute in Monaten (1–120). Eigene Einträge der gewählten Typen jenseits davon werden entfernt. |
 | `event_types` | nein (nur Ereignis-Dienst) | Liste aus `birthday`, `anniversary`, `other`, `custom` (alle selbst benannten Typen), `all` oder dem Namen eines eigenen Typs, z. B. `Hochzeitstag`. Standard: `birthday` |
 | `title_format` | nein (nur Ereignis-Dienst) | Titelformat nur für diesen Aufruf, für alle gewählten Typen. Ohne Angabe gelten die Optionen. |
 
@@ -39,7 +39,9 @@ data:
   event_types: [birthday, anniversary, custom]
 ```
 
-Rückgabe: `{desired, created, deleted, unchanged}`.
+Rückgabe: `{desired, created, deleted, unchanged}`. Dazu `unmatched_types`, falls gewählte eigene Typen in keinem Kontakt vorkommen (wahrscheinlich Tippfehler; nur Warnung, kein Abbruch).
+
+Die festen Typen werden unabhängig von Groß- und Kleinschreibung erkannt. Läufe in denselben Kalender werden nacheinander ausgeführt.
 
 ## Titelformat
 
@@ -70,7 +72,7 @@ Zwei Automationen mit verschiedenen Formaten für denselben Typ und Kalender wü
 - **Diagnose:** *Einstellungen → Geräte & Dienste → Advanced Google Contacts → ⋮ → Diagnose herunterladen*.
   Enthalten sind die Version, die Optionen, der Abrufstatus, Kontakt-Statistiken (nur Anzahlen), das Ergebnis des letzten Syncs und die aktiven Reparaturhinweise.
   Token, Kontoadresse und Kontaktnamen werden entfernt.
-- **Reparaturhinweise** (*Einstellungen → System → Reparaturen*):
+- **Reparaturhinweise** (*Einstellungen → System → Reparaturen*), werden beim Entfernen der Integration mitgelöscht:
   - *Kalender-Sync fehlgeschlagen*: pro Kalender, mit der Fehlermeldung. Verschwindet nach dem nächsten erfolgreichen Sync in diesen Kalender.
   - *Alte Integration noch eingerichtet*: solange `google_contacts_basedog` noch eingerichtet ist.
 
@@ -89,7 +91,7 @@ Zwei Automationen mit verschiedenen Formaten für denselben Typ und Kalender wü
 Die Action **Release** legt dann automatisch den Release `vX.Y.Z` an, und HACS bietet das Update an.
 Sie bricht ab, wenn der Changelog-Abschnitt fehlt oder die Version niedriger ist als der letzte Release.
 Gibt es den Release schon, tut sie nichts. Manuell lässt sie sich über *Actions → Release → Run workflow* starten.
-Die Action **Validate** prüft bei jedem Push und Pull Request die Version, den Changelog, die Python-Syntax, hassfest und die HACS-Struktur.
+Die Action **Validate** prüft bei jedem Push und Pull Request die Version, den Changelog, die Python-Syntax, hassfest, die HACS-Struktur und führt die Tests aus.
 
 ## Umstieg von `google_contacts_basedog` (≤ 4.7) auf `advanced_google_contacts` (0.1)
 
@@ -107,7 +109,7 @@ Bereits angelegte Geburtstagstermine bleiben gültig. Der Sync erkennt sie an Ti
 
 - Voraussetzungen: `application_credentials` (Google OAuth-Client vom Typ „Webanwendung“, People API aktiviert, Redirect-URI `https://my.home-assistant.io/redirect/oauth`) und `calendar`.
 - Scopes: `contacts.readonly openid email`, mit `access_type=offline` und `prompt=consent`, damit ein Refresh-Token ausgestellt wird.
-- Es ist nur **ein** Konto erlaubt (`single_instance_allowed`).
+- Es ist nur **ein** Konto erlaubt (`single_instance_allowed`). Der Eintrag ist an dieses Konto gebunden (`unique_id` = Kontoadresse); eine erneute Anmeldung mit einem anderen Konto wird abgelehnt.
 - Beim Start wird die E-Mail-Adresse des Kontos über OpenID UserInfo ermittelt und als Titel des Eintrags gesetzt. Bei 401/403 startet HA automatisch die Reauthentifizierung (`ConfigEntryAuthFailed`).
 - Optionen: `create_contact_entities` (Standard im Code: ein), `title_format_birthday`, `title_format_event`. Eine Änderung lädt den Eintrag neu (`OptionsFlowWithReload`).
 
@@ -137,25 +139,26 @@ Bereits angelegte Geburtstagstermine bleiben gültig. Der Sync erkennt sie an Ti
 2. **Soll-Liste** für den Zeitraum heute bis heute + `months` erstellen, für die gewählten Ereignistypen und mit dem Titelformat.
    Pro Kontakt, Typ und Tag zählt ein Datum. Eine Angabe mit Jahr hat Vorrang vor einer ohne.
    Wer am 29.02. Geburtstag hat, bekommt den Termin in Nicht-Schaltjahren am 28.02.
-3. **Anlegen:** Fehlende Termine werden ganztägig angelegt. Die Beschreibung ist die Markierung:
+3. **Vorabprüfung:** Müssten Einträge gelöscht werden und kann der Kalender nicht löschen (oder liefert keine UID), bricht der Sync ab, bevor er etwas anlegt.
+4. **Anlegen:** Fehlende Termine werden ganztägig angelegt. Die erste Zeile der Beschreibung ist die Markierung (darunter dürfen eigene Notizen stehen):
    „Synchronisiert aus Advanced Google Contacts“ für Geburtstage, mit angehängtem Typ für andere Ereignisse, z. B. „… [anniversary]“ oder „… [custom:Hochzeitstag]“.
-4. **Kontrolllesen:** Fehlt danach ein Soll-Termin, bricht der Sync ab, **ohne etwas zu löschen**.
-5. **Aufräumen:** Betrachtet werden nur Termine mit Markierung eines **gewählten** Typs, auch die alte „… Google Contacts Basedog“ (= Geburtstag).
+5. **Kontrolllesen:** Fehlt danach ein Soll-Termin, bricht der Sync ab, **ohne etwas zu löschen**.
+6. **Aufräumen:** Betrachtet werden nur Termine mit Markierung eines **gewählten** Typs, von heute bis 120 Monate voraus, auch die alte „… Google Contacts Basedog“ (= Geburtstag).
    Ein Termin wird über Datum, Titel und Typ erkannt. Passt er nicht genau zu einem Soll-Termin, wird er über seine UID gelöscht.
-   Das betrifft Duplikate, veraltete Alter, geänderte Titelformate und umbenannte oder gelöschte Kontakte.
+   Das betrifft Duplikate, veraltete Alter, geänderte Titelformate, umbenannte oder gelöschte Kontakte und Einträge jenseits des Zeitraums.
    Von Hand angelegte Termine und Termine nicht gewählter Typen bleiben unangetastet.
-6. **Abschlussprüfung:** Jeder Soll-Termin muss genau einmal vorhanden sein.
+7. **Abschlussprüfung:** Jeder Soll-Termin muss genau einmal vorhanden sein.
 
 Im Einsatz: Die Automation „Geburtstage in Kalender eintragen“ läuft täglich um 01:00 mit `calendar.geburtstage` und `months: 24`.
 
-## Hinweise aus der Code-Analyse
+## Bekannte Grenzen
 
-Bereits behoben: veraltete Registry-API, Sync mit veralteten Daten, Löschen fremder Termine, unnötiges Polling,
-deutscher Text in `en.json`.
-
-Noch offen:
-
-- **Von Hand angelegte Termine mit gleichem Titel** werden nicht gelöscht. Neben ihnen legt der Sync aber einen eigenen Termin an, sodass er doppelt erscheint.
-- Der Zielkalender muss die Terminbeschreibung beim Lesen zurückgeben. Sonst bricht der Sync mit einer Fehlermeldung ab, ohne etwas zu löschen.
 - **Gleicher Titel am gleichen Tag:** Ergeben zwei Kontakte am selben Tag denselben Titel (gleicher Name), entsteht nur ein Termin.
-- **Gelöschte Kontakte** hinterlassen bei aktivierten Entitäten Sensoren, die auf „nicht verfügbar“ stehen. Ihre Geräte werden nicht automatisch entfernt.
+- **Zielkalender muss die Beschreibung zurückgeben.** Sonst bricht der Sync mit einer Fehlermeldung ab, ohne etwas zu löschen.
+- **Erste Zeile der Beschreibung geändert:** Der Termin gilt dann als fremd, und der Sync legt einen neuen an.
+- **Zwei Automationen für denselben Typ und Kalender** mit unterschiedlichem Titelformat oder Zeitraum schreiben sich gegenseitig um.
+- **Gelöschte Kontakte** hinterlassen bei aktivierten Entitäten Sensoren, die auf „nicht verfügbar“ stehen.
+
+## Tests
+
+Siehe [tests/README.md](tests/README.md). Die Tests laufen bei jedem Push in der Action **Validate** mit.

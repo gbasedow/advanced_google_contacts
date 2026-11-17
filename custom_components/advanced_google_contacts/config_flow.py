@@ -1,10 +1,13 @@
 import logging
+from aiohttp import ClientError
 from homeassistant.config_entries import SOURCE_REAUTH, OptionsFlowWithReload
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 from homeassistant.core import callback
 from .const import (DOMAIN,SCOPE,CONF_CREATE_CONTACT_ENTITIES,DEFAULT_CREATE_CONTACT_ENTITIES,
  CONF_TITLE_FORMAT_BIRTHDAY,CONF_TITLE_FORMAT_EVENT,DEFAULT_TITLE_FORMAT_BIRTHDAY,DEFAULT_TITLE_FORMAT_EVENT)
+from .api import fetch_account_email
 from .title_format import PLACEHOLDERS,TitleFormatError,validate_title_format
 # The form description shows the placeholders literally, e.g. "{name}".
 PLACEHOLDER_HINTS={p:"{"+p+"}" for p in PLACEHOLDERS}
@@ -30,9 +33,22 @@ class Flow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler,domain=DOMAIN):
  def async_get_options_flow(config_entry):
   return OptionsFlow()
  async def async_oauth_create_entry(self,data):
+  # Bind the entry to the Google account: unique_id = account email.
+  try:
+   email=await fetch_account_email(async_get_clientsession(self.hass),data["token"]["access_token"])
+  except (ClientError,TimeoutError,ValueError,KeyError) as err:
+   _LOGGER.warning("Could not read the Google account email: %s",err)
+   return self.async_abort(reason="cannot_connect")
   if self.source==SOURCE_REAUTH:
-   e=self._get_reauth_entry();return self.async_update_reload_and_abort(e,data={**e.data,**data})
-  return self.async_create_entry(title="Advanced Google Contacts",data=data)
+   e=self._get_reauth_entry()
+   # Entries from before 0.4.0 have no unique_id; their title is the account email.
+   expected=e.unique_id or (e.title if "@" in e.title else None)
+   if expected and expected.casefold()!=email.casefold():
+    return self.async_abort(reason="wrong_account")
+   return self.async_update_reload_and_abort(e,unique_id=email,title=email,data={**e.data,**data})
+  await self.async_set_unique_id(email)
+  self._abort_if_unique_id_configured()
+  return self.async_create_entry(title=email,data=data)
 
 
 class OptionsFlow(OptionsFlowWithReload):

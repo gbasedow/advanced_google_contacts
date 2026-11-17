@@ -2,6 +2,7 @@ import datetime as dt
 from types import SimpleNamespace
 
 import pytest
+import voluptuous as vol
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er, issue_registry as ir
@@ -14,7 +15,7 @@ from custom_components.advanced_google_contacts.calendar_sync import MARKER
 from custom_components.advanced_google_contacts.const import DOMAIN
 from custom_components.advanced_google_contacts.coordinator import Coordinator
 from custom_components.advanced_google_contacts.diagnostics import async_get_config_entry_diagnostics
-from .fakes import FakeCal, FakeCoord, contact, nxt, setup_cal
+from .fakes import FakeCal, FakeCoord, contact, setup_cal
 
 
 def make_local_entry(hass, **options):
@@ -74,9 +75,9 @@ def test_events_schema():
     data = EVENTS_SCHEMA({"calendar": "calendar.x", "months": "3"})
     assert data["event_types"] == ["birthday"] and data["months"] == 3
     assert EVENTS_SCHEMA({"calendar": "calendar.x", "months": 3, "event_types": "anniversary"})["event_types"] == ["anniversary"]
-    with pytest.raises(Exception):
+    with pytest.raises(vol.Invalid):
         EVENTS_SCHEMA({"calendar": "calendar.x", "months": 3, "title_format": "{age}"})
-    with pytest.raises(Exception):
+    with pytest.raises(vol.Invalid):
         EVENTS_SCHEMA({"calendar": "calendar.x", "months": 3, "event_types": []})
 
 

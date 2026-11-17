@@ -16,4 +16,4 @@ Für eine neuere HA-Version als die vom Test-Plugin vorgegebene (z. B. 2026.11.x
 .venv/bin/python -c "import sys, homeassistant, pytest; sys.exit(pytest.main())"
 ```
 
-Tests mit `should` im Namen beschreiben gewünschtes Verhalten; schlagen sie fehl, ist das ein Befund.
+Die Tests laufen auch in der GitHub-Action **Validate** (Job „Tests“) mit der HA-Version, die das Test-Plugin vorgibt.

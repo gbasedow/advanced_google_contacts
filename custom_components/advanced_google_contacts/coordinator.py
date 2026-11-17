@@ -35,7 +35,23 @@ class Coordinator(DataUpdateCoordinator):
         )
 
     async def async_account_email(self):
-        return await self.api.account_email()
+        """Email of the connected account.
+
+        Raises ConfigEntryAuthFailed when Google rejects the token or returns no
+        email (missing scope), UpdateFailed for temporary errors.
+        """
+        try:
+            return await self.api.account_email()
+        except ClientResponseError as e:
+            if e.status in (401, 403):
+                raise ConfigEntryAuthFailed(f"Google UserInfo rejected the token: HTTP {e.status}") from e
+            raise UpdateFailed(f"Google UserInfo HTTP {e.status}") from e
+        except ValueError as e:
+            raise ConfigEntryAuthFailed(str(e)) from e
+        except ClientError as e:
+            raise UpdateFailed(str(e)) from e
+        except TimeoutError as e:
+            raise UpdateFailed("Google UserInfo timeout") from e
 
     async def async_fetch_contacts(self):
         """Fetch contacts now; errors are raised instead of being logged.

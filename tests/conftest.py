@@ -27,7 +27,14 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture(autouse=True)
-async def base_setup(hass, freezer):
+def _recorder_before_hass(request):
+    """Tests using recorder_mock need the database prepared before hass starts."""
+    if "recorder_mock" in request.fixturenames:
+        request.getfixturevalue("recorder_db_url")
+
+
+@pytest.fixture(autouse=True)
+async def base_setup(_recorder_before_hass, hass, freezer):
     freezer.move_to(NOW)
     await hass.config.async_set_time_zone(TZ)
     assert await async_setup_component(hass, "application_credentials", {})

@@ -58,3 +58,23 @@ jobs:
           # description/topics/license: only required for the HACS default store,
           # not for installation as a custom repository.
           ignore: brands description topics license
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install test environment
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest-homeassistant-custom-component pyyaml
+          # local_calendar (the real target calendar in the tests) needs its pinned ical version
+          ICAL=$(python -c "import json, homeassistant.components.local_calendar as m, pathlib; print(json.loads((pathlib.Path(m.__file__).parent / 'manifest.json').read_text())['requirements'][0])")
+          pip install "$ICAL"
+          python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
+      - name: Run tests
+        # Home Assistant must be imported before the test plugin (httpx aliasing).
+        run: python -c "import sys, homeassistant, pytest; sys.exit(pytest.main(['-q', '-p', 'no:cacheprovider']))"

@@ -1,5 +1,19 @@
 # Advanced Google Contacts – Changelog
 
+## 0.4.0 – Korrekturen aus dem Testlauf
+- **Keine externe Bibliothek mehr:** `python-dateutil` wird nicht mehr benötigt. Die Monatsrechnung ist eingebaut, ein fehlender Tag im Zielmonat wird auf den Monatsletzten gesetzt.
+- **Start bei Netzproblemen:** Ein vorübergehender Fehler beim Abruf der Kontoadresse (Netzwerk, Timeout, HTTP 5xx) führt zu einem neuen Versuch statt zu einem dauerhaften Fehler. Eine fehlende E-Mail startet die erneute Anmeldung.
+- **Kontobindung:** Der Eintrag ist an das Google-Konto gebunden (`unique_id`). Eine erneute Anmeldung mit einem anderen Konto wird abgelehnt. Bestehende Einträge werden beim Start automatisch gebunden.
+- **Kalender ohne Löschfunktion:** Müssten Einträge gelöscht werden, bricht der Sync ab, bevor er etwas anlegt. Es entstehen keine Doppeleinträge mehr.
+- **Gleichzeitige Syncs** in denselben Kalender laufen nacheinander statt gegeneinander.
+- **Ereignistypen:** `birthday`, `anniversary`, `other`, `custom` und `all` werden unabhängig von Groß- und Kleinschreibung erkannt. Eigene Typen, die in keinem Kontakt vorkommen, stehen als Warnung im Log und in der Rückgabe (`unmatched_types`).
+- **Zeitraum:** Eigene Einträge der gewählten Typen jenseits von „Monate“ werden entfernt (geprüft bis 120 Monate voraus). „Monate“ begrenzt damit strikt, wie weit im Voraus Einträge existieren.
+- **Notizen in Terminen:** Ein Eintrag bleibt eigener, solange die erste Zeile der Beschreibung die Markierung ist. Darunter dürfen eigene Notizen stehen.
+- **Reparaturhinweise** werden beim Entfernen der Integration mitgelöscht.
+- **Gerätenamen** folgen Umbenennungen in Google. Ein in HA selbst vergebener Name bleibt.
+- **Historie:** Das Attribut `values` der Kontakt-Sensoren wird nicht mehr in der Historie gespeichert. Der Zustand schon.
+- **Tests:** 111 automatische Tests gegen eine echte HA-Instanz laufen jetzt bei jedem Push mit.
+
 ## 0.3.0 – Beliebige Ereignisse, Titelformat, Diagnose und Reparaturhinweise
 - **Beliebige Ereignisse:** Neuer Dienst `sync_events_from_google_contacts` für Geburtstage, Jahrestage, sonstige und eigene Ereignistypen.
   Ein Aufruf verwaltet nur die Einträge der gewählten Typen. `sync_birthdays_from_google_contacts` bleibt unverändert nutzbar.

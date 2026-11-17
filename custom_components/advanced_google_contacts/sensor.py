@@ -1,5 +1,6 @@
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN,ENTITY_FIELDS,LABELS
@@ -22,10 +23,18 @@ def primary(field,v):
  elif field=="ageRanges":s=x.get("ageRange","")
  else:s=""
  return str(s or (f"{len(a)} Eintrag" if len(a)==1 else f"{len(a)} Einträge"))[:255]
+def _sync_device_names(hass,entry,contacts):
+ """Follow renames in Google; a name set by the user in HA (name_by_user) is kept."""
+ reg=dr.async_get(hass)
+ for device in dr.async_entries_for_config_entry(reg,entry.entry_id):
+  rn=next((i[1] for i in device.identifiers if i[0]==DOMAIN),None)
+  name=(contacts.get(rn) or {}).get("display_name") if rn else None
+  if name and device.name!=name:reg.async_update_device(device.id,name=name)
 async def async_setup_entry(hass,entry,add):
  c=hass.data[DOMAIN][entry.entry_id];known=set()
  @callback
  def sync_entities():
+  _sync_device_names(hass,entry,c.data or {})
   new=[]
   for rn,contact in (c.data or {}).items():
    for field in ENTITY_FIELDS:
@@ -37,6 +46,8 @@ async def async_setup_entry(hass,entry,add):
  sync_entities();entry.async_on_unload(c.async_add_listener(sync_entities))
 class Property(CoordinatorEntity,SensorEntity):
  _attr_icon="mdi:card-account-details-outline"
+ # The raw values can be large; keep them live but out of the recorder.
+ _unrecorded_attributes=frozenset({"values"})
  def __init__(self,c,e,rn,field):
   super().__init__(c);self.rn=rn;self.field=field;self._attr_unique_id=f"{e.entry_id}_{rn.replace('/','_')}_{field}";self._attr_name=LABELS.get(field,field)
  @property

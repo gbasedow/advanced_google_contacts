@@ -9,7 +9,10 @@
     },
     "abort": {
       "single_instance_allowed": "Only one account can be configured.",
-      "reauth_successful": "Google account was successfully reauthenticated."
+      "reauth_successful": "Google account was successfully reauthenticated.",
+      "wrong_account": "Wrong Google account. Please sign in with the account that was originally set up.",
+      "cannot_connect": "Failed to connect to Google. Please try again later.",
+      "already_configured": "This Google account is already configured."
     }
   },
   "application_credentials": {

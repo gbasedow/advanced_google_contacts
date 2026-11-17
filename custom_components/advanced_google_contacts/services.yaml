@@ -11,7 +11,7 @@ sync_birthdays_from_google_contacts:
           domain: calendar
     months:
       name: Monate
-      description: Anzahl Monate in der Zukunft.
+      description: Anzahl Monate in der Zukunft. Eigene Einträge der gewählten Typen jenseits davon werden entfernt.
       required: true
       default: 12
       selector:
@@ -35,7 +35,7 @@ sync_events_from_google_contacts:
           domain: calendar
     months:
       name: Monate
-      description: Anzahl Monate in der Zukunft.
+      description: Anzahl Monate in der Zukunft. Eigene Einträge der gewählten Typen jenseits davon werden entfernt.
       required: true
       default: 12
       selector:

@@ -5,7 +5,7 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import config_entry_oauth2_flow
 
-from custom_components.advanced_google_contacts.const import DOMAIN, PROFILE_URL, TOKEN
+from custom_components.advanced_google_contacts.const import DOMAIN, TOKEN
 from .conftest import EMAIL, make_entry, person
 
 REDIRECT = "https://example.com/auth/external/callback"
@@ -28,7 +28,7 @@ async def test_full_oauth_flow_creates_entry(hass, hass_client_no_auth, aioclien
     assert result["type"] == FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     entry = hass.config_entries.async_entries(DOMAIN)[0]
-    assert entry.title == EMAIL  # renamed on setup
+    assert entry.title == EMAIL and entry.unique_id == EMAIL
 
 
 async def test_single_instance(hass, google):
@@ -71,3 +71,22 @@ async def test_options_flow_validation(hass, setup_integration):
     await hass.async_block_till_done()
     assert entry.options["title_format_birthday"] == "🎂 {name}"
     assert entry.state is config_entries.ConfigEntryState.LOADED
+
+
+async def test_oauth_flow_userinfo_error_aborts(hass, hass_client_no_auth, aioclient_mock, current_request_with_host, google):
+    google.userinfo_status = 500
+    google.install()
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _complete_oauth(hass, hass_client_no_auth, aioclient_mock, result)
+    assert result["type"] == FlowResultType.ABORT and result["reason"] == "cannot_connect"
+
+
+async def test_reauth_legacy_entry_without_unique_id(hass, hass_client_no_auth, aioclient_mock, current_request_with_host, google):
+    """A pre-0.4.0 entry (title = email, no unique_id) accepts its own account and gets the unique_id."""
+    entry = make_entry(hass)
+    hass.config_entries.async_update_entry(entry, title=EMAIL)
+    result = await entry.start_reauth_flow(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    result = await _complete_oauth(hass, hass_client_no_auth, aioclient_mock, result)
+    assert result["reason"] == "reauth_successful"
+    assert entry.unique_id == EMAIL

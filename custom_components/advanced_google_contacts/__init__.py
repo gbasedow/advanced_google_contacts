@@ -1,8 +1,11 @@
+import asyncio
 import logging
+
 import voluptuous as vol
 
 from homeassistant.core import SupportsResponse
-from homeassistant.exceptions import HomeAssistantError, ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.helpers import (
     config_entry_oauth2_flow,
     config_validation as cv,
@@ -88,8 +91,12 @@ async def _run_sync(hass, call, event_types):
         "title_formats": formats,
     }
     issue_id = sync_issue_id(cal)
+    # One sync per calendar at a time: parallel runs would both create entries
+    # and then see each other's entries as duplicates.
+    lock = hass.data.setdefault(f"{DOMAIN}_locks", {}).setdefault(cal, asyncio.Lock())
     try:
-        result = await sync_events(hass, coordinator, cal, call.data["months"], event_types, formats)
+        async with lock:
+            result = await sync_events(hass, coordinator, cal, call.data["months"], event_types, formats)
     except HomeAssistantError as err:
         coordinator.last_sync = {**info, "success": False, "error": str(err)}
         ir.async_create_issue(
@@ -188,22 +195,22 @@ async def async_setup_entry(hass, entry):
     coordinator = Coordinator(hass, entry, oauth, poll=create_entities)
     await coordinator.async_config_entry_first_refresh()
 
-    # Resolve the account identity before exposing entities. If the existing OAuth
-    # grant predates the OpenID scopes, Google UserInfo returns 401/403. Raising
-    # ConfigEntryAuthFailed from async_setup_entry makes Home Assistant start the
-    # integration's linked reauthentication flow automatically.
+    # Resolve the account identity before exposing entities. 401/403 or a missing
+    # email raise ConfigEntryAuthFailed (reauthentication); temporary errors make
+    # Home Assistant retry the setup.
     try:
         account_email = await coordinator.async_account_email()
-    except Exception as err:
-        status = getattr(err, "status", None)
-        if status in (401, 403):
-            raise ConfigEntryAuthFailed(
-                "Google authorization must be renewed to grant the account identity scopes"
-            ) from err
-        raise
+    except UpdateFailed as err:
+        raise ConfigEntryNotReady(str(err)) from err
 
+    # Entries created before 0.4.0 have no unique_id; bind them to their account.
+    updates = {}
     if entry.title != account_email:
-        hass.config_entries.async_update_entry(entry, title=account_email)
+        updates["title"] = account_email
+    if entry.unique_id is None:
+        updates["unique_id"] = account_email
+    if updates:
+        hass.config_entries.async_update_entry(entry, **updates)
     _LOGGER.info("Authenticated Google Contacts account: %s", account_email)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -220,6 +227,13 @@ async def async_setup_entry(hass, entry):
         _remove_contact_registry_entries(hass, entry)
 
     return True
+
+
+async def async_remove_entry(hass, entry):
+    """Remove the repair issues of this integration together with the entry."""
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if domain == DOMAIN:
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
 async def async_unload_entry(hass, entry):

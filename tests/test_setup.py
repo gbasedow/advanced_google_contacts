@@ -11,7 +11,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.advanced_google_contacts.const import DOMAIN
-from .conftest import EMAIL, make_entry, person
+from .conftest import EMAIL, person
 
 PEOPLE = [
     person("1", "Anna Muster", birthday=(1990, 3, 10), phoneNumbers=[{"value": "+49 1"}]),
@@ -146,10 +146,28 @@ async def test_userinfo_500_should_retry_setup(hass, setup_integration, google):
     assert entry.state is ConfigEntryState.SETUP_RETRY
 
 
-async def test_userinfo_without_email(hass, setup_integration, google):
+async def test_userinfo_without_email_starts_reauth(hass, setup_integration, google):
     google.email = None
     entry = await setup_integration(PEOPLE)
-    assert entry.state in (ConfigEntryState.SETUP_ERROR, ConfigEntryState.SETUP_RETRY)
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert any(f["context"]["source"] == SOURCE_REAUTH for f in hass.config_entries.flow.async_progress())
+
+
+async def test_legacy_entry_gets_unique_id(hass, setup_integration):
+    """Entries from before 0.4.0 have no unique_id; setup binds them to the account."""
+    entry = await setup_integration(PEOPLE, create_contact_entities=False)
+    assert entry.unique_id == EMAIL
+
+
+async def test_userinfo_retry_recovers(hass, setup_integration, google):
+    google.userinfo_status = 500
+    entry = await setup_integration(PEOPLE)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    google.userinfo_status = 200
+    google.install()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=10))
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert entry.state is ConfigEntryState.LOADED
 
 
 async def test_service_without_loaded_entry(hass, setup_integration, google, local_calendar):
