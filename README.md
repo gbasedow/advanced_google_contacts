@@ -2,7 +2,7 @@
 
 <img src="custom_components/advanced_google_contacts/brand/icon.png" width="96" alt="Logo">
 
-Domain: `advanced_google_contacts` · Version: 0.1.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
+Domain: `advanced_google_contacts` · Version: 0.2.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
 
 ## Zweck
 

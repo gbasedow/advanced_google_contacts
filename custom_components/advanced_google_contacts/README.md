@@ -1,5 +1,15 @@
 # Advanced Google Contacts – Changelog
 
+## 0.2.0 – Sicherer Geburtstags-Sync
+- **Nur eigene Termine:** Der Sync vergleicht und löscht nur noch Termine, die er selbst angelegt hat. Er erkennt sie an der Beschreibung
+  „Synchronisiert aus Advanced Google Contacts“ oder an der alten „… Google Contacts Basedog“. Von Hand eingetragene Termine bleiben unangetastet.
+- **Immer frische Daten:** Vor jedem Sync werden die Kontakte direkt bei Google geladen. Bei einem Fehler oder einer leeren Kontaktliste
+  bricht der Sync ab, ohne den Kalender zu ändern. Bei abgelaufener Anmeldung startet die erneute Anmeldung.
+- **Weniger Abfragen:** Sind die Kontakt-Entitäten ausgeschaltet, gibt es keinen Abruf alle 30 Minuten mehr, nur noch beim Start und beim Sync.
+- **Kompatibilität:** Die Registry wird über die offiziellen Hilfsfunktionen bereinigt. Damit fällt die Warnung im Log weg, und das Aufräumen funktioniert auch ab HA 2027.9.
+- `CONFIG_SCHEMA` ergänzt, Redirect-URI in den Übersetzungen per Platzhalter, `en.json` vollständig englisch.
+- Hinweis: Der Zielkalender muss beim Lesen die Terminbeschreibung zurückgeben. Sonst bricht der Sync mit einer Meldung ab, ohne etwas zu löschen.
+
 ## 0.1.0 – Erste Version als „Advanced Google Contacts“
 Neue Versionszählung ab 0.1.0. Funktional identisch mit `google_contacts_basedog` 4.7.0.
 - Domain `google_contacts_basedog` → `advanced_google_contacts`, Name „Advanced Google Contacts“.
