@@ -8,12 +8,12 @@
       }
     },
     "abort": {
-      "single_instance_allowed": "Es kann nur ein Konto eingerichtet werden.",
+      "single_instance_allowed": "Only one account can be configured.",
       "reauth_successful": "Google account was successfully reauthenticated."
     }
   },
   "application_credentials": {
-    "description": "Google OAuth-2.0-Webanwendung; People API aktivieren; Redirect URI https://my.home-assistant.io/redirect/oauth"
+    "description": "Create a Google OAuth 2.0 client of type web application, enable the People API and add {redirect_url} as redirect URI."
   },
   "options": {
     "step": {

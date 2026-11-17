@@ -21,6 +21,8 @@ from .coordinator import Coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 SCHEMA = vol.Schema({
     vol.Required("calendar"): cv.entity_id,
     vol.Required("months"): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),

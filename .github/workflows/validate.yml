@@ -54,5 +54,7 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Brand images ship locally in custom_components/.../brand (HA 2026.3+).
-          ignore: brands
+          # brands: images ship locally in custom_components/.../brand (HA 2026.3+).
+          # description/topics/license: only required for the HACS default store,
+          # not for installation as a custom repository.
+          ignore: brands description topics license
