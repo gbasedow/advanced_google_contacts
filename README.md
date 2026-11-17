@@ -12,6 +12,12 @@ Die Integration verbindet Home Assistant per OAuth2 mit der **Google People API*
    Die Geburtstage aller Kontakte werden als ganztägige Termine in einen beschreibbaren HA-Kalender geschrieben.
 2. **Kontakt-Entitäten** (optional): Für jeden Kontakt entsteht ein Gerät mit einem Sensor pro befülltem Kontaktfeld.
 
+## Installation über HACS
+
+1. HACS → ⋮ → *Benutzerdefinierte Repositories* → URL `https://github.com/gbasedow/advanced_google_contacts`, Typ **Integration**.
+2. „Advanced Google Contacts“ herunterladen und Home Assistant neu starten.
+3. *Einstellungen → Geräte & Dienste → Integration hinzufügen → Advanced Google Contacts*.
+
 ## Umstieg von `google_contacts_basedog` (≤ 4.7) auf `advanced_google_contacts` (5.0)
 
 Durch die neue Domain ist es für Home Assistant eine **neue Integration**. Der alte Eintrag wird nicht übernommen.
@@ -80,4 +86,3 @@ Im Einsatz: Die Automation „Geburtstage in Kalender eintragen“ läuft tägli
   der Sync mit den zuletzt erfolgreich geladenen Kontakten. Eine Prüfung von `coordinator.last_update_success` wäre sinnvoll.
 - **Gelöschte Kontakte** hinterlassen bei aktivierten Entitäten Sensoren, die auf „nicht verfügbar“ stehen. Ihre Geräte werden nicht automatisch entfernt.
 - `translations/en.json`: Der Text für `single_instance_allowed` ist noch deutsch.
-- Für HACS fehlt noch eine `hacs.json`.
