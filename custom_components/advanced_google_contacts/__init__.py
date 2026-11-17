@@ -8,25 +8,120 @@ from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
     entity_registry as er,
+    issue_registry as ir,
 )
+from homeassistant.util import dt as dt_util, slugify
 
-from .birthday_sync import sync_birthdays
+from .calendar_sync import sync_events
 from .const import (
     DOMAIN,
     PLATFORMS,
     CONF_CREATE_CONTACT_ENTITIES,
+    CONF_TITLE_FORMAT_BIRTHDAY,
+    CONF_TITLE_FORMAT_EVENT,
     DEFAULT_CREATE_CONTACT_ENTITIES,
+    DEFAULT_TITLE_FORMAT_BIRTHDAY,
+    DEFAULT_TITLE_FORMAT_EVENT,
+    EVENT_TYPE_BIRTHDAY,
+    LEGACY_DOMAIN,
+    SERVICE_SYNC_BIRTHDAYS,
+    SERVICE_SYNC_EVENTS,
 )
 from .coordinator import Coordinator
+from .title_format import TitleFormatError, validate_title_format
 
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-SCHEMA = vol.Schema({
+ISSUE_LEGACY = "legacy_integration_installed"
+
+
+def _title_format(value):
+    try:
+        return validate_title_format(value)
+    except TitleFormatError as err:
+        raise vol.Invalid(f"Ungültiges Titelformat: {err}") from err
+
+
+_BASE = {
     vol.Required("calendar"): cv.entity_id,
     vol.Required("months"): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
+}
+SCHEMA = vol.Schema(_BASE)
+EVENTS_SCHEMA = vol.Schema({
+    **_BASE,
+    vol.Optional("event_types", default=[EVENT_TYPE_BIRTHDAY]): vol.All(
+        cv.ensure_list, [vol.All(cv.string, vol.Length(min=1))], vol.Length(min=1)
+    ),
+    vol.Optional("title_format"): _title_format,
 })
+
+
+def sync_issue_id(calendar_entity_id: str) -> str:
+    return f"sync_failed_{slugify(calendar_entity_id)}"
+
+
+def _formats(entry, override=None) -> dict[str, str]:
+    if override:
+        return {EVENT_TYPE_BIRTHDAY: override, "event": override}
+    return {
+        EVENT_TYPE_BIRTHDAY: entry.options.get(CONF_TITLE_FORMAT_BIRTHDAY, DEFAULT_TITLE_FORMAT_BIRTHDAY),
+        "event": entry.options.get(CONF_TITLE_FORMAT_EVENT, DEFAULT_TITLE_FORMAT_EVENT),
+    }
+
+
+async def _run_sync(hass, call, event_types):
+    cal = call.data["calendar"]
+    if not cal.startswith("calendar."):
+        raise HomeAssistantError("calendar muss eine calendar.* Entität sein.")
+    entries = hass.data.get(DOMAIN, {})
+    if not entries:
+        raise HomeAssistantError("Advanced Google Contacts ist nicht geladen.")
+    coordinator = next(iter(entries.values()))
+    formats = _formats(coordinator.entry, call.data.get("title_format"))
+    info = {
+        "time": dt_util.utcnow().isoformat(),
+        "calendar": cal,
+        "months": call.data["months"],
+        "event_types": sorted(event_types),
+        "title_formats": formats,
+    }
+    issue_id = sync_issue_id(cal)
+    try:
+        result = await sync_events(hass, coordinator, cal, call.data["months"], event_types, formats)
+    except HomeAssistantError as err:
+        coordinator.last_sync = {**info, "success": False, "error": str(err)}
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            is_persistent=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="sync_failed",
+            translation_placeholders={"calendar": cal, "error": str(err)},
+        )
+        raise
+    coordinator.last_sync = {**info, "success": True, "result": result}
+    ir.async_delete_issue(hass, DOMAIN, issue_id)
+    return result
+
+
+def _check_legacy_integration(hass) -> None:
+    """Raise a repair issue while the old google_contacts_basedog entry exists."""
+    if hass.config_entries.async_entries(LEGACY_DOMAIN):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            ISSUE_LEGACY,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_LEGACY,
+            translation_placeholders={"legacy_domain": LEGACY_DOMAIN, "domain": DOMAIN},
+        )
+    else:
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_LEGACY)
 
 
 def _remove_contact_registry_entries(hass, entry):
@@ -63,25 +158,20 @@ def _remove_contact_registry_entries(hass, entry):
 
 
 async def async_setup(hass, config):
-    async def action(call):
-        cal = call.data["calendar"]
-        if not cal.startswith("calendar."):
-            raise HomeAssistantError("calendar muss eine calendar.* Entität sein.")
-        entries = hass.data.get(DOMAIN, {})
-        if not entries:
-            raise HomeAssistantError("Advanced Google Contacts ist nicht geladen.")
-        return await sync_birthdays(
-            hass, next(iter(entries.values())), cal, call.data["months"]
-        )
+    async def sync_birthdays_action(call):
+        return await _run_sync(hass, call, [EVENT_TYPE_BIRTHDAY])
 
-    if not hass.services.has_service(DOMAIN, "sync_birthdays_from_google_contacts"):
-        hass.services.async_register(
-            DOMAIN,
-            "sync_birthdays_from_google_contacts",
-            action,
-            schema=SCHEMA,
-            supports_response=SupportsResponse.OPTIONAL,
-        )
+    async def sync_events_action(call):
+        return await _run_sync(hass, call, call.data["event_types"])
+
+    for name, handler, schema in (
+        (SERVICE_SYNC_BIRTHDAYS, sync_birthdays_action, SCHEMA),
+        (SERVICE_SYNC_EVENTS, sync_events_action, EVENTS_SCHEMA),
+    ):
+        if not hass.services.has_service(DOMAIN, name):
+            hass.services.async_register(
+                DOMAIN, name, handler, schema=schema, supports_response=SupportsResponse.OPTIONAL
+            )
     return True
 
 
@@ -117,6 +207,7 @@ async def async_setup_entry(hass, entry):
     _LOGGER.info("Authenticated Google Contacts account: %s", account_email)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    _check_legacy_integration(hass)
     loaded_platforms = hass.data.setdefault(f"{DOMAIN}_loaded_platforms", set())
 
     if create_entities:

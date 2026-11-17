@@ -3,7 +3,11 @@ from homeassistant.config_entries import SOURCE_REAUTH, OptionsFlowWithReload
 from homeassistant.helpers import config_entry_oauth2_flow
 import voluptuous as vol
 from homeassistant.core import callback
-from .const import DOMAIN,SCOPE,CONF_CREATE_CONTACT_ENTITIES,DEFAULT_CREATE_CONTACT_ENTITIES
+from .const import (DOMAIN,SCOPE,CONF_CREATE_CONTACT_ENTITIES,DEFAULT_CREATE_CONTACT_ENTITIES,
+ CONF_TITLE_FORMAT_BIRTHDAY,CONF_TITLE_FORMAT_EVENT,DEFAULT_TITLE_FORMAT_BIRTHDAY,DEFAULT_TITLE_FORMAT_EVENT)
+from .title_format import PLACEHOLDERS,TitleFormatError,validate_title_format
+# The form description shows the placeholders literally, e.g. "{name}".
+PLACEHOLDER_HINTS={p:"{"+p+"}" for p in PLACEHOLDERS}
 _LOGGER=logging.getLogger(__name__)
 class Flow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler,domain=DOMAIN):
  DOMAIN=DOMAIN
@@ -33,8 +37,17 @@ class Flow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler,domain=DOMAIN):
 
 class OptionsFlow(OptionsFlowWithReload):
  async def async_step_init(self,user_input=None):
+  errors={}
   if user_input is not None:
-   return self.async_create_entry(title="",data=user_input)
-  return self.async_show_form(step_id="init",data_schema=vol.Schema({
-   vol.Required(CONF_CREATE_CONTACT_ENTITIES,default=self.config_entry.options.get(CONF_CREATE_CONTACT_ENTITIES,DEFAULT_CREATE_CONTACT_ENTITIES)):bool
+   data=dict(user_input)
+   for key in (CONF_TITLE_FORMAT_BIRTHDAY,CONF_TITLE_FORMAT_EVENT):
+    try:data[key]=validate_title_format(data.get(key,""))
+    except TitleFormatError:errors[key]="invalid_title_format"
+   if not errors:
+    return self.async_create_entry(title="",data=data)
+  current={**self.config_entry.options,**(user_input or {})}
+  return self.async_show_form(step_id="init",errors=errors,description_placeholders=PLACEHOLDER_HINTS,data_schema=vol.Schema({
+   vol.Required(CONF_CREATE_CONTACT_ENTITIES,default=current.get(CONF_CREATE_CONTACT_ENTITIES,DEFAULT_CREATE_CONTACT_ENTITIES)):bool,
+   vol.Required(CONF_TITLE_FORMAT_BIRTHDAY,default=current.get(CONF_TITLE_FORMAT_BIRTHDAY,DEFAULT_TITLE_FORMAT_BIRTHDAY)):str,
+   vol.Required(CONF_TITLE_FORMAT_EVENT,default=current.get(CONF_TITLE_FORMAT_EVENT,DEFAULT_TITLE_FORMAT_EVENT)):str,
   }))

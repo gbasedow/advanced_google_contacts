@@ -12,3 +12,21 @@ CONF_CREATE_CONTACT_ENTITIES="create_contact_entities"
 DEFAULT_CREATE_CONTACT_ENTITIES=True
 
 PROFILE_URL="https://openidconnect.googleapis.com/v1/userinfo"
+
+# Calendar sync: event types and title formats
+CONF_TITLE_FORMAT_BIRTHDAY="title_format_birthday"
+CONF_TITLE_FORMAT_EVENT="title_format_event"
+DEFAULT_TITLE_FORMAT_BIRTHDAY="Geburtstag {name}[ - {age}]"
+DEFAULT_TITLE_FORMAT_EVENT="{type} {name}[ - {age}]"
+
+EVENT_TYPE_BIRTHDAY="birthday"
+EVENT_TYPE_ANNIVERSARY="anniversary"
+EVENT_TYPE_OTHER="other"
+EVENT_TYPE_CUSTOM="custom"
+EVENT_TYPE_ALL="all"
+EVENT_TYPE_LABELS={EVENT_TYPE_BIRTHDAY:"Geburtstag",EVENT_TYPE_ANNIVERSARY:"Jahrestag",EVENT_TYPE_OTHER:"Ereignis"}
+
+SERVICE_SYNC_BIRTHDAYS="sync_birthdays_from_google_contacts"
+SERVICE_SYNC_EVENTS="sync_events_from_google_contacts"
+
+LEGACY_DOMAIN="google_contacts_basedog"

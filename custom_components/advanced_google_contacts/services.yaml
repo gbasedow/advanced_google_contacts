@@ -20,3 +20,59 @@ sync_birthdays_from_google_contacts:
           max: 120
           step: 1
           mode: box
+sync_events_from_google_contacts:
+  name: Sync Events from Google Contacts
+  description: >-
+    Synchronisiert Geburtstage und weitere Ereignisse der Google-Kontakte (Jahrestage, sonstige und eigene Ereignisse)
+    als ganztägige Termine. Vermeidet Duplikate und entfernt nur selbst angelegte, veraltete Einträge der gewählten Typen.
+  fields:
+    calendar:
+      name: Kalender
+      description: Zielkalender; muss Ereignisse erstellen und löschen können.
+      required: true
+      selector:
+        entity:
+          domain: calendar
+    months:
+      name: Monate
+      description: Anzahl Monate in der Zukunft.
+      required: true
+      default: 12
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+          mode: box
+    event_types:
+      name: Ereignistypen
+      description: >-
+        Welche Ereignisse übernommen werden. „Eigene Ereignisse“ umfasst alle selbst benannten Typen;
+        ein einzelner eigener Typ kann als Text eingegeben werden (z. B. Hochzeitstag).
+      required: false
+      default:
+        - birthday
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options:
+            - label: Geburtstage
+              value: birthday
+            - label: Jahrestage
+              value: anniversary
+            - label: Sonstige Ereignisse
+              value: other
+            - label: Eigene Ereignisse (alle selbst benannten Typen)
+              value: custom
+            - label: Alle Ereignisse
+              value: all
+    title_format:
+      name: Titelformat
+      description: >-
+        Optional, gilt für alle gewählten Typen dieses Aufrufs. Ohne Angabe gelten die Formate aus den Optionen.
+        Platzhalter {name}, {first_name}, {last_name}, {type}, {age}, {year}; Text in [ ] entfällt, wenn ein Platzhalter darin leer ist.
+      required: false
+      example: "{type}: {name}[ ({age})]"
+      selector:
+        text:

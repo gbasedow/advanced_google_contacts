@@ -1,5 +1,14 @@
 # Advanced Google Contacts – Changelog
 
+## Unveröffentlicht
+- **Beliebige Ereignisse:** Neuer Dienst `sync_events_from_google_contacts` für Geburtstage, Jahrestage, sonstige und eigene Ereignistypen.
+  Ein Aufruf verwaltet nur die Einträge der gewählten Typen. `sync_birthdays_from_google_contacts` bleibt unverändert nutzbar.
+- **Titelformat:** In den Optionen einstellbar, getrennt für Geburtstage und andere Ereignisse, pro Aufruf überschreibbar.
+  Platzhalter {name}, {first_name}, {last_name}, {type}, {age}, {year}, optionale Teile in [ ]. Der Standard entspricht den bisherigen Titeln.
+- **Diagnose-Download** ohne Token, Kontoadresse und Kontaktnamen.
+- **Reparaturhinweise:** bei fehlgeschlagenem Kalender-Sync (pro Kalender) und solange die alte Integration google_contacts_basedog eingerichtet ist.
+- Hat ein Kontakt einen Geburtstag mit und ohne Jahr, gilt jetzt immer die Angabe mit Jahr.
+
 ## 0.2.0 – Sicherer Geburtstags-Sync
 - **Nur eigene Termine:** Der Sync vergleicht und löscht nur noch Termine, die er selbst angelegt hat. Er erkennt sie an der Beschreibung
   „Synchronisiert aus Advanced Google Contacts“ oder an der alten „… Google Contacts Basedog“. Von Hand eingetragene Termine bleiben unangetastet.

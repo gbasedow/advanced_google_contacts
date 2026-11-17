@@ -18,15 +18,32 @@
   "options": {
     "step": {
       "init": {
-        "title": "Kontakt-Entitäten",
-        "description": "Lege fest, ob für jeden Google-Kontakt ein Gerät mit Entitäten angelegt wird. Die Geburtstags-Sync-Aktion bleibt unabhängig davon verfügbar.",
+        "title": "Optionen",
+        "description": "Kontakt-Entitäten und Titelformate der Kalendereinträge.\n\nPlatzhalter: {name}, {first_name}, {last_name}, {type}, {age}, {year}. Text in eckigen Klammern entfällt, wenn ein Platzhalter darin leer ist.\n\nBeispiele: Geburtstag {name}[ - {age}] oder {type} {name}[ ({age}. Jahr)]. {type} ist z. B. Jahrestag oder der Name eines eigenen Ereignistyps.",
         "data": {
-          "create_contact_entities": "Entitäten für Kontakte anlegen"
+          "create_contact_entities": "Entitäten für Kontakte anlegen",
+          "title_format_birthday": "Titelformat für Geburtstage",
+          "title_format_event": "Titelformat für andere Ereignisse"
         },
         "data_description": {
-          "create_contact_entities": "Aus: Es werden keine Kontakt-Geräte/-Entitäten angelegt; der Geburtstags-Sync bleibt verfügbar."
+          "create_contact_entities": "Aus: Es werden keine Kontakt-Geräte/-Entitäten angelegt; der Kalender-Sync bleibt verfügbar.",
+          "title_format_birthday": "Gilt für Geburtstage.",
+          "title_format_event": "Gilt für Jahrestage, sonstige und eigene Ereignisse."
         }
       }
+    },
+    "error": {
+      "invalid_title_format": "Ungültiges Titelformat. Nur die oben genannten Platzhalter, mindestens ein Namensplatzhalter, eckige Klammern paarweise und nicht verschachtelt."
+    }
+  },
+  "issues": {
+    "sync_failed": {
+      "title": "Kalender-Sync für {calendar} fehlgeschlagen",
+      "description": "Der letzte Sync in den Kalender {calendar} ist fehlgeschlagen:\n\n{error}\n\nDer Hinweis verschwindet nach dem nächsten erfolgreichen Sync in diesen Kalender."
+    },
+    "legacy_integration_installed": {
+      "title": "Alte Integration noch eingerichtet",
+      "description": "Die Vorgänger-Integration ({legacy_domain}) ist noch eingerichtet. Lösche sie unter Einstellungen → Geräte & Dienste, entferne ihren Ordner aus custom_components und stelle Automationen auf die Dienste von {domain} um. Der Hinweis verschwindet beim nächsten Laden, sobald die alte Integration entfernt ist."
     }
   }
 }

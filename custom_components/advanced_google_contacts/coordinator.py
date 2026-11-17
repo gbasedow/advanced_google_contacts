@@ -24,6 +24,8 @@ class Coordinator(DataUpdateCoordinator):
     def __init__(self, hass, entry, oauth, poll=True):
         self.entry = entry
         self.api = API(oauth)
+        # Outcome of the last calendar sync, shown in the diagnostics download.
+        self.last_sync = None
         super().__init__(
             hass,
             _LOGGER,

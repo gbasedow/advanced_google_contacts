@@ -18,15 +18,32 @@
   "options": {
     "step": {
       "init": {
-        "title": "Contact entities",
-        "description": "Choose whether each Google contact is exposed as a device with entities. Birthday sync remains available.",
+        "title": "Options",
+        "description": "Contact entities and title formats of calendar entries.\n\nPlaceholders: {name}, {first_name}, {last_name}, {type}, {age}, {year}. Text in square brackets is left out when one of its placeholders is empty.\n\nExamples: Geburtstag {name}[ - {age}] or {type} {name}[ ({age}. Jahr)]. {type} is e.g. the anniversary label or the name of your own event type.",
         "data": {
-          "create_contact_entities": "Create entities for contacts"
+          "create_contact_entities": "Create entities for contacts",
+          "title_format_birthday": "Title format for birthdays",
+          "title_format_event": "Title format for other events"
         },
         "data_description": {
-          "create_contact_entities": "Off: only birthday sync remains available."
+          "create_contact_entities": "Off: no contact devices/entities are created; calendar sync remains available.",
+          "title_format_birthday": "Used for birthdays.",
+          "title_format_event": "Used for anniversaries, other and custom events."
         }
       }
+    },
+    "error": {
+      "invalid_title_format": "Invalid title format. Only the placeholders listed above, at least one name placeholder, square brackets in pairs and not nested."
+    }
+  },
+  "issues": {
+    "sync_failed": {
+      "title": "Calendar sync for {calendar} failed",
+      "description": "The last sync into the calendar {calendar} failed:\n\n{error}\n\nThis notice disappears after the next successful sync into this calendar."
+    },
+    "legacy_integration_installed": {
+      "title": "Old integration still configured",
+      "description": "The predecessor integration ({legacy_domain}) is still configured. Delete it under Settings → Devices & services, remove its folder from custom_components and switch automations to the actions of {domain}. This notice disappears on the next load once the old integration is removed."
     }
   }
 }
