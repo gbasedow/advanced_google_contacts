@@ -28,7 +28,7 @@ class Flow(config_entry_oauth2_flow.AbstractOAuth2FlowHandler,domain=DOMAIN):
  async def async_oauth_create_entry(self,data):
   if self.source==SOURCE_REAUTH:
    e=self._get_reauth_entry();return self.async_update_reload_and_abort(e,data={**e.data,**data})
-  return self.async_create_entry(title="Google Contacts Basedog",data=data)
+  return self.async_create_entry(title="Advanced Google Contacts",data=data)
 
 
 class OptionsFlow(OptionsFlowWithReload):

@@ -1,14 +1,28 @@
-# Google Contacts Basedog (Home Assistant Custom Integration)
+# Advanced Google Contacts (Home Assistant Custom Integration)
 
-Domain: `google_contacts_basedog` · Version: 4.7.0 · Quelle: aus der laufenden HA-Installation übernommen (`/config/custom_components/google_contacts_basedog`).
+<img src="custom_components/advanced_google_contacts/brand/icon.png" width="96" alt="Logo">
+
+Domain: `advanced_google_contacts` · Version: 5.0.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
 
 ## Zweck
 
 Die Integration verbindet Home Assistant per OAuth2 mit der **Google People API** (nur Lesezugriff auf Kontakte) und bietet zwei Funktionen:
 
-1. **Geburtstags-Sync** (Dienst `google_contacts_basedog.sync_birthdays_from_google_contacts`):
+1. **Geburtstags-Sync** (Dienst `advanced_google_contacts.sync_birthdays_from_google_contacts`):
    Die Geburtstage aller Kontakte werden als ganztägige Termine in einen beschreibbaren HA-Kalender geschrieben.
 2. **Kontakt-Entitäten** (optional): Für jeden Kontakt entsteht ein Gerät mit einem Sensor pro befülltem Kontaktfeld.
+
+## Umstieg von `google_contacts_basedog` (≤ 4.7) auf `advanced_google_contacts` (5.0)
+
+Durch die neue Domain ist es für Home Assistant eine **neue Integration**. Der alte Eintrag wird nicht übernommen.
+
+1. In HA die alte Integration „Google Contacts Basedog“ löschen.
+2. `/config/custom_components/google_contacts_basedog` entfernen, `custom_components/advanced_google_contacts` kopieren und HA neu starten.
+3. Unter *Einstellungen → Anwendungs-Anmeldeinformationen* die Google-OAuth-Client-ID und das Secret für „Advanced Google Contacts“ eintragen. Die alten gehören zur alten Domain.
+4. Die Integration „Advanced Google Contacts“ hinzufügen und mit Google anmelden. Danach bei Bedarf die Option für Kontakt-Entitäten setzen.
+5. In Automationen den Dienst auf `advanced_google_contacts.sync_birthdays_from_google_contacts` umstellen.
+
+Bereits angelegte Geburtstagstermine bleiben gültig, weil der Sync sie am Titel erkennt.
 
 ## Einrichtung
 
@@ -32,6 +46,7 @@ Die Integration verbindet Home Assistant per OAuth2 mit der **Google People API*
 | `sensor.py` | Ein Gerät pro Kontakt, ein Sensor pro befülltem Feld (der Name immer). Zustand = erster Wert (max. 255 Zeichen), Attribut `values` = alle Rohwerte. Neue Kontakte werden dynamisch ergänzt. |
 | `birthday_sync.py` | Logik des Geburtstags-Syncs (siehe unten) |
 | `services.yaml`, `strings.json`, `translations/` | Dienstbeschreibung und UI-Texte (de/en) |
+| `brand/` | Icon und Logo (`icon.png` 256², `icon@2x.png` 512², `logo.png`, `logo@2x.png`); von HA ab 2026.3 genutzt |
 
 ## Ablauf des Geburtstags-Syncs
 
@@ -42,7 +57,7 @@ Parameter: `calendar` (`calendar.*`, muss Termine anlegen können; zum Aufräume
    `Geburtstag <Name> - <Alter>`, bzw. `Geburtstag <Name>`, wenn das Geburtsjahr fehlt.
    Wer am 29.02. Geburtstag hat, bekommt den Termin in Nicht-Schaltjahren am 28.02.
 3. **Anlegen:** Termine aus der Soll-Liste, die im Kalender noch nicht exakt so stehen, werden angelegt
-   (ganztägig, Beschreibung „Synchronisiert aus Google Contacts Basedog“).
+   (ganztägig, Beschreibung „Synchronisiert aus Advanced Google Contacts“).
 4. **Kontrolllesen:** Fehlt danach ein Soll-Termin, bricht der Sync ab, **ohne etwas zu löschen**.
 5. **Aufräumen:** Jeder Termin im Zeitraum, dessen Titel zum Muster `^Geburtstag <Name>( - <Zahl>)?$` passt und
    nicht genau einem Soll-Termin entspricht, wird über seine UID gelöscht. Das betrifft Duplikate, veraltete Alter und umbenannte oder gelöschte Kontakte.
@@ -65,4 +80,4 @@ Im Einsatz: Die Automation „Geburtstage in Kalender eintragen“ läuft tägli
   der Sync mit den zuletzt erfolgreich geladenen Kontakten. Eine Prüfung von `coordinator.last_update_success` wäre sinnvoll.
 - **Gelöschte Kontakte** hinterlassen bei aktivierten Entitäten Sensoren, die auf „nicht verfügbar“ stehen. Ihre Geräte werden nicht automatisch entfernt.
 - `translations/en.json`: Der Text für `single_instance_allowed` ist noch deutsch.
-- `manifest.json`: `codeowners` ist leer, `documentation` zeigt auf die Google-Dokumentation. Für HACS fehlen `issue_tracker` und `hacs.json`.
+- Für HACS fehlt noch eine `hacs.json`.

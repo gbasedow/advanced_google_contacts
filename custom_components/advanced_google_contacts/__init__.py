@@ -70,7 +70,7 @@ async def async_setup(hass, config):
             raise HomeAssistantError("calendar muss eine calendar.* Entität sein.")
         entries = hass.data.get(DOMAIN, {})
         if not entries:
-            raise HomeAssistantError("Google Contacts Basedog ist nicht geladen.")
+            raise HomeAssistantError("Advanced Google Contacts ist nicht geladen.")
         return await sync_birthdays(
             hass, next(iter(entries.values())), cal, call.data["months"]
         )

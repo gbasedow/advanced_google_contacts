@@ -6,7 +6,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator,Updat
 from .api import API
 class Coordinator(DataUpdateCoordinator):
  def __init__(self,hass,entry,oauth):
-  self.entry=entry;self.api=API(oauth);super().__init__(hass,logging.getLogger(__name__),name="Google Contacts Basedog",update_interval=timedelta(minutes=30))
+  self.entry=entry;self.api=API(oauth);super().__init__(hass,logging.getLogger(__name__),name="Advanced Google Contacts",update_interval=timedelta(minutes=30))
  async def async_account_email(self):
   return await self.api.account_email()
  async def _async_update_data(self):

@@ -1,4 +1,4 @@
-DOMAIN="google_contacts_basedog"
+DOMAIN="advanced_google_contacts"
 PLATFORMS=["sensor"]
 AUTHORIZE="https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN="https://oauth2.googleapis.com/token"

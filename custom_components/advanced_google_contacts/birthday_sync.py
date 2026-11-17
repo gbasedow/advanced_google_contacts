@@ -109,7 +109,7 @@ async def sync_birthdays(hass, coordinator, calendar_entity_id: str, months: int
                 summary=wanted_summary,
                 dtstart=date,
                 dtend=date + dt.timedelta(days=1),
-                description="Synchronisiert aus Google Contacts Basedog",
+                description="Synchronisiert aus Advanced Google Contacts",
             )
             created += 1
         except Exception as err:
