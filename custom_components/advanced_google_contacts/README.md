@@ -1,13 +1,14 @@
-# Advanced Google Contacts 5.0.0
+# Advanced Google Contacts – Changelog
 
-## 5.0.0 – Umbenennung
+## 0.1.0 – Erste Version als „Advanced Google Contacts“
+Neue Versionszählung ab 0.1.0. Funktional identisch mit `google_contacts_basedog` 4.7.0.
 - Domain `google_contacts_basedog` → `advanced_google_contacts`, Name „Advanced Google Contacts“.
 - Dienst heißt jetzt `advanced_google_contacts.sync_birthdays_from_google_contacts`.
 - Eigenes Logo unter `brand/` (wird ab Home Assistant 2026.3 angezeigt).
 - `manifest.json`: Dokumentation/Issue-Tracker zeigen auf das GitHub-Repo, `codeowners` gesetzt.
-- Sonst keine funktionalen Änderungen gegenüber 4.7.0.
+- Installation über HACS (`hacs.json`).
 
-## 4.7.0 – Fix: Optionswechsel Kontakt-Entitäten
+## Vorgänger `google_contacts_basedog` 4.7.0 – Fix: Optionswechsel Kontakt-Entitäten
 4.7 behebt `ValueError: Config entry was never loaded!` beim Wechsel von
 „Entitäten aus“ zu „Entitäten ein“.
 

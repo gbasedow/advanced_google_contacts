@@ -2,7 +2,7 @@
 
 <img src="custom_components/advanced_google_contacts/brand/icon.png" width="96" alt="Logo">
 
-Domain: `advanced_google_contacts` · Version: 5.0.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
+Domain: `advanced_google_contacts` · Version: 0.1.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
 
 ## Zweck
 
@@ -18,7 +18,7 @@ Die Integration verbindet Home Assistant per OAuth2 mit der **Google People API*
 2. „Advanced Google Contacts“ herunterladen und Home Assistant neu starten.
 3. *Einstellungen → Geräte & Dienste → Integration hinzufügen → Advanced Google Contacts*.
 
-## Umstieg von `google_contacts_basedog` (≤ 4.7) auf `advanced_google_contacts` (5.0)
+## Umstieg von `google_contacts_basedog` (≤ 4.7) auf `advanced_google_contacts` (0.1)
 
 Durch die neue Domain ist es für Home Assistant eine **neue Integration**. Der alte Eintrag wird nicht übernommen.
 
