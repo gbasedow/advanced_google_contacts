@@ -1,6 +1,6 @@
 # Advanced Google Contacts – Changelog
 
-## Unveröffentlicht
+## 0.3.0 – Beliebige Ereignisse, Titelformat, Diagnose und Reparaturhinweise
 - **Beliebige Ereignisse:** Neuer Dienst `sync_events_from_google_contacts` für Geburtstage, Jahrestage, sonstige und eigene Ereignistypen.
   Ein Aufruf verwaltet nur die Einträge der gewählten Typen. `sync_birthdays_from_google_contacts` bleibt unverändert nutzbar.
 - **Titelformat:** In den Optionen einstellbar, getrennt für Geburtstage und andere Ereignisse, pro Aufruf überschreibbar.
