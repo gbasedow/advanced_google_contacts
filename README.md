@@ -58,7 +58,7 @@ Bereits angelegte Geburtstagstermine bleiben gültig, weil der Sync sie am Titel
 | `application_credentials.py` | Google-Autorisierungs- und Token-Endpunkt |
 | `config_flow.py` | OAuth2-Flow, Reauth und Options-Flow (Kontakt-Entitäten ein/aus) |
 | `api.py` | `account_email()` über UserInfo; `contacts()` lädt alle Kontakte seitenweise (1000 pro Seite) und überspringt gelöschte. Ergebnis: Dict `resourceName → Kontakt` mit `display_name`. |
-| `coordinator.py` | `DataUpdateCoordinator`, Abruf alle **30 Minuten**; 401/403 → Reauth, andere Fehler → `UpdateFailed` |
+| `coordinator.py` | `DataUpdateCoordinator`. Abruf alle **30 Minuten** nur bei aktivierten Kontakt-Entitäten, sonst nur beim Start und beim Sync. 401/403 → Reauth, andere Fehler → `UpdateFailed` |
 | `__init__.py` | Setup und Unload, Registrierung des Dienstes, Aufräumen der Registry, wenn Entitäten deaktiviert sind |
 | `sensor.py` | Ein Gerät pro Kontakt, ein Sensor pro befülltem Feld (der Name immer). Zustand = erster Wert (max. 255 Zeichen), Attribut `values` = alle Rohwerte. Neue Kontakte werden dynamisch ergänzt. |
 | `birthday_sync.py` | Logik des Geburtstags-Syncs (siehe unten) |
@@ -69,31 +69,34 @@ Bereits angelegte Geburtstagstermine bleiben gültig, weil der Sync sie am Titel
 
 Parameter: `calendar` (`calendar.*`, muss Termine anlegen können; zum Aufräumen auch löschen) und `months` (1–120).
 
-1. Prüfen, ob der Kalender existiert und `CREATE_EVENT` unterstützt. Dann die Kontakte neu anfordern.
+1. Prüfen, ob der Kalender existiert und `CREATE_EVENT` unterstützt. Dann die Kontakte **frisch** bei Google laden.
+   Scheitert das, oder liefert Google keine Kontakte, bricht der Sync ab, ohne den Kalender zu ändern.
+   Bei abgelaufener Anmeldung startet zusätzlich die Reauthentifizierung.
 2. **Soll-Liste** für den Zeitraum heute bis heute + `months` erstellen. Schlüssel ist *(Anzeigename, Datum)*, der Titel lautet
    `Geburtstag <Name> - <Alter>`, bzw. `Geburtstag <Name>`, wenn das Geburtsjahr fehlt.
    Wer am 29.02. Geburtstag hat, bekommt den Termin in Nicht-Schaltjahren am 28.02.
 3. **Anlegen:** Termine aus der Soll-Liste, die im Kalender noch nicht exakt so stehen, werden angelegt
    (ganztägig, Beschreibung „Synchronisiert aus Advanced Google Contacts“).
 4. **Kontrolllesen:** Fehlt danach ein Soll-Termin, bricht der Sync ab, **ohne etwas zu löschen**.
-5. **Aufräumen:** Jeder Termin im Zeitraum, dessen Titel zum Muster `^Geburtstag <Name>( - <Zahl>)?$` passt und
-   nicht genau einem Soll-Termin entspricht, wird über seine UID gelöscht. Das betrifft Duplikate, veraltete Alter und umbenannte oder gelöschte Kontakte.
+5. **Aufräumen:** Betrachtet werden nur Termine, die der Sync selbst angelegt hat: Titel `^Geburtstag <Name>( - <Zahl>)?$` **und**
+   Beschreibung „Synchronisiert aus Advanced Google Contacts“ oder die alte „… Google Contacts Basedog“.
+   Passt so ein Termin nicht genau zu einem Soll-Termin, wird er über seine UID gelöscht. Das betrifft Duplikate, veraltete Alter und umbenannte oder gelöschte Kontakte.
+   Von Hand angelegte Termine bleiben immer unangetastet.
 6. **Abschlussprüfung:** Jeder Soll-Termin muss genau einmal vorhanden sein.
 7. Rückgabe: `{desired, created, deleted, unchanged}`.
 
 Im Einsatz: Die Automation „Geburtstage in Kalender eintragen“ läuft täglich um 01:00 mit `calendar.geburtstage` und `months: 24`.
 
-## Hinweise aus der Code-Analyse (noch nicht umgesetzt)
+## Hinweise aus der Code-Analyse
 
-- **Veraltete Registry-API** (`__init__.py`, `_remove_contact_registry_entries`): `device_registry.devices.values()` ist
-  laut HA-Log ab **2027.9.0** nicht mehr nutzbar. Ersatz: `dr.async_entries_for_config_entry(device_registry, entry.entry_id)`,
-  analog `er.async_entries_for_config_entry(...)` für Entitäten.
-- **Eigener Kalender empfohlen:** Der Sync löscht im Zeitraum *jeden* Termin, der wie `Geburtstag <Name>` aussieht und
-  nicht zur Soll-Liste passt, auch von Hand angelegte Einträge.
+Bereits behoben: veraltete Registry-API, Sync mit veralteten Daten, Löschen fremder Termine, unnötiges Polling,
+deutscher Text in `en.json`.
+
+Noch offen:
+
+- **Von Hand angelegte Termine mit gleichem Titel** werden nicht gelöscht. Neben ihnen legt der Sync aber einen eigenen Termin an, sodass er doppelt erscheint.
+- Der Zielkalender muss die Terminbeschreibung beim Lesen zurückgeben. Sonst bricht der Sync mit einer Fehlermeldung ab, ohne etwas zu löschen.
 - **Identität = Anzeigename:** Haben zwei Kontakte denselben Namen und denselben Geburtstag, entsteht nur ein Termin.
   Liefert Google für einen Kontakt mehrere Geburtstagsangaben (z. B. einmal mit und einmal ohne Jahr), gewinnt die zuletzt gelesene.
   Der Titel mit Alter ist also nicht garantiert.
-- **Veraltete Daten:** `async_request_refresh()` wirft bei einem Fehler keine Exception. Schlägt der Abruf fehl, arbeitet
-  der Sync mit den zuletzt erfolgreich geladenen Kontakten. Eine Prüfung von `coordinator.last_update_success` wäre sinnvoll.
 - **Gelöschte Kontakte** hinterlassen bei aktivierten Entitäten Sensoren, die auf „nicht verfügbar“ stehen. Ihre Geräte werden nicht automatisch entfernt.
-- `translations/en.json`: Der Text für `single_instance_allowed` ist noch deutsch.

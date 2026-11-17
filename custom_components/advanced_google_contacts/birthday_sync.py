@@ -9,11 +9,26 @@ from typing import Any
 from dateutil.relativedelta import relativedelta
 
 from homeassistant.components.calendar import DATA_COMPONENT, CalendarEntity, CalendarEntityFeature
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 RX = re.compile(r"^Geburtstag (?P<name>.+?)(?: - (?P<age>\d+))?$")
+
+# Description written into every created event. Only events carrying one of
+# these markers are treated as managed (compared, deduplicated, deleted);
+# all other events in the calendar are never touched.
+MARKER = "Synchronisiert aus Advanced Google Contacts"
+LEGACY_MARKERS = ("Synchronisiert aus Google Contacts Basedog",)
+MARKERS = (MARKER, *LEGACY_MARKERS)
+
+
+def managed_match(event) -> re.Match | None:
+    """Return the title match if the event was created by this sync."""
+    if (getattr(event, "description", None) or "").strip() not in MARKERS:
+        return None
+    return RX.fullmatch(event.summary or "")
 
 
 def event_date(value: dt.date | dt.datetime) -> dt.date:
@@ -82,20 +97,32 @@ async def sync_birthdays(hass, coordinator, calendar_entity_id: str, months: int
     if not features & CalendarEntityFeature.CREATE_EVENT:
         raise HomeAssistantError("Geburtstags-Sync: Der gewählte Kalender unterstützt das Erstellen von Terminen nicht.")
 
+    # Always work on freshly fetched contacts. Any error aborts the sync before
+    # the calendar is touched, so stale data can never cause deletions.
     try:
-        await coordinator.async_request_refresh()
-    except Exception as err:
-        raise HomeAssistantError(f"Geburtstags-Sync: Google-Kontakte konnten nicht aktualisiert werden: {err}") from err
+        contacts = await coordinator.async_fetch_contacts()
+    except ConfigEntryAuthFailed as err:
+        coordinator.entry.async_start_reauth(hass)
+        raise HomeAssistantError(
+            "Geburtstags-Sync: Google-Anmeldung abgelaufen, bitte die Integration neu authentifizieren."
+        ) from err
+    except UpdateFailed as err:
+        raise HomeAssistantError(f"Geburtstags-Sync: Google-Kontakte konnten nicht geladen werden: {err}") from err
+    if not contacts:
+        raise HomeAssistantError(
+            "Geburtstags-Sync: Google hat keine Kontakte geliefert. Aus Sicherheitsgründen wird nichts geändert."
+        )
+    coordinator.async_set_updated_data(contacts)
 
     today = dt_util.now().date()
     range_end = today + relativedelta(months=months)
-    desired = desired_birthdays(coordinator.data or {}, today, range_end)
+    desired = desired_birthdays(contacts, today, range_end)
 
     # Phase 1: read and create missing events. No deletion happens before all creates succeed.
     existing = await _read(cal, hass, today, range_end)
     exact_existing: set[tuple[str, dt.date, str]] = set()
     for event in existing:
-        match = RX.fullmatch(event.summary or "")
+        match = managed_match(event)
         if match:
             exact_existing.add((match.group("name"), event_date(event.start), event.summary))
 
@@ -109,7 +136,7 @@ async def sync_birthdays(hass, coordinator, calendar_entity_id: str, months: int
                 summary=wanted_summary,
                 dtstart=date,
                 dtend=date + dt.timedelta(days=1),
-                description="Synchronisiert aus Advanced Google Contacts",
+                description=MARKER,
             )
             created += 1
         except Exception as err:
@@ -124,7 +151,7 @@ async def sync_birthdays(hass, coordinator, calendar_entity_id: str, months: int
     kept: set[tuple[str, dt.date]] = set()
     to_delete = []
     for event in after_create:
-        match = RX.fullmatch(event.summary or "")
+        match = managed_match(event)
         if not match:
             continue
         key = (match.group("name"), event_date(event.start))
@@ -139,8 +166,9 @@ async def sync_birthdays(hass, coordinator, calendar_entity_id: str, months: int
     if missing_after_create:
         sample = ", ".join(missing_after_create[:3])
         raise HomeAssistantError(
-            "Geburtstags-Sync: Der Kalender hat neu erstellte Termine beim Kontrolllesen nicht zurückgegeben. "
-            f"Es wird aus Sicherheitsgründen nichts gelöscht. Beispiele: {sample}"
+            "Geburtstags-Sync: Der Kalender hat neu erstellte Termine beim Kontrolllesen nicht "
+            "(oder ohne Beschreibung) zurückgegeben. Es wird aus Sicherheitsgründen nichts gelöscht. "
+            f"Beispiele: {sample}"
         )
 
     deleted = 0
@@ -168,7 +196,7 @@ async def sync_birthdays(hass, coordinator, calendar_entity_id: str, months: int
     final_events = await _read(cal, hass, today, range_end)
     counts: dict[tuple[str, dt.date, str], int] = {}
     for event in final_events:
-        match = RX.fullmatch(event.summary or "")
+        match = managed_match(event)
         if match:
             k = (match.group("name"), event_date(event.start), event.summary)
             counts[k] = counts.get(k, 0) + 1

@@ -42,17 +42,14 @@ def _remove_contact_registry_entries(hass, entry):
     # that might no longer be linked to a device.
     entity_ids = [
         entity.entity_id
-        for entity in entity_registry.entities.values()
-        if entity.config_entry_id == entry.entry_id
+        for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id)
     ]
     for entity_id in entity_ids:
         entity_registry.async_remove(entity_id)
 
-    # HA Core 2026.8+ devices belong to exactly one config entry.
     device_ids = [
         device.id
-        for device in device_registry.devices.values()
-        if device.config_entry_id == entry.entry_id
+        for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id)
     ]
     for device_id in device_ids:
         device_registry.async_remove_device(device_id)
@@ -93,7 +90,12 @@ async def async_setup_entry(hass, entry):
         hass, entry
     )
     oauth = config_entry_oauth2_flow.OAuth2Session(hass, entry, impl)
-    coordinator = Coordinator(hass, entry, oauth)
+    create_entities = entry.options.get(
+        CONF_CREATE_CONTACT_ENTITIES, DEFAULT_CREATE_CONTACT_ENTITIES
+    )
+    # Without contact entities nobody needs periodic polling: the birthday sync
+    # fetches fresh contacts itself.
+    coordinator = Coordinator(hass, entry, oauth, poll=create_entities)
     await coordinator.async_config_entry_first_refresh()
 
     # Resolve the account identity before exposing entities. If the existing OAuth
@@ -117,9 +119,6 @@ async def async_setup_entry(hass, entry):
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     loaded_platforms = hass.data.setdefault(f"{DOMAIN}_loaded_platforms", set())
 
-    create_entities = entry.options.get(
-        CONF_CREATE_CONTACT_ENTITIES, DEFAULT_CREATE_CONTACT_ENTITIES
-    )
     if create_entities:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         loaded_platforms.add(entry.entry_id)
