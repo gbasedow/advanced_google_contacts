@@ -2,7 +2,7 @@
 
 <img src="custom_components/advanced_google_contacts/brand/icon.png" width="96" alt="Logo">
 
-Domain: `advanced_google_contacts` · Version: 0.4.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
+Domain: `advanced_google_contacts` · Version: 0.5.0 · Ursprünglich als `google_contacts_basedog` 4.7.0 aus der laufenden HA-Installation übernommen.
 
 ## Zweck
 
@@ -130,6 +130,7 @@ Bereits angelegte Geburtstagstermine bleiben gültig. Der Sync erkennt sie an Ti
 | `diagnostics.py` | Diagnose-Download |
 | `services.yaml`, `strings.json`, `translations/` | Dienstbeschreibung und UI-Texte (de/en) |
 | `brand/` | Icon und Logo (`icon.png` 256², `icon@2x.png` 512², `logo.png`, `logo@2x.png`); von HA ab 2026.3 genutzt |
+| `assets/icon.svg` (Repo-Wurzel) | Vektorvorlage des Icons, aus der die Bilder in `brand/` erzeugt werden |
 
 ## Ablauf des Kalender-Syncs
 

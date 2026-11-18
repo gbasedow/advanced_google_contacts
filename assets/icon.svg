@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- register tabs (behind the book) -->
+  <rect x="380" y="96"  width="84" height="76" rx="22" fill="#578CFF"/>
+  <rect x="380" y="200" width="84" height="76" rx="22" fill="#86A9FF"/>
+  <rect x="380" y="304" width="84" height="76" rx="22" fill="#578CFF"/>
+  <!-- page stack -->
+  <rect x="64" y="52" width="330" height="428" rx="54" fill="#86A9FF"/>
+  <!-- cover -->
+  <rect x="48" y="32" width="340" height="436" rx="54" fill="#0057CC"/>
+  <!-- person -->
+  <circle cx="218" cy="166" r="64" fill="#86A9FF"/>
+  <path d="M118 342 a100 92 0 0 1 100 -92 a100 92 0 0 1 100 92 v4 a14 14 0 0 1 -14 14 h-172 a14 14 0 0 1 -14 -14 z" fill="#86A9FF"/>
+  <!-- text lines -->
+  <rect x="118" y="392" width="200" height="22" rx="11" fill="#578CFF"/>
+</svg>

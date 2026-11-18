@@ -1,5 +1,9 @@
 # Advanced Google Contacts – Changelog
 
+## 0.5.0 – Neues Icon
+- **Neues Icon und Logo:** Ein Adressbuch mit Person, Register-Reitern und Seitenstapel, in den Farben des bisherigen Logos (#0057CC, #578CFF, #86A9FF).
+- Die Vektorvorlage liegt unter `assets/icon.svg` im Repository.
+
 ## 0.4.0 – Korrekturen aus dem Testlauf
 - **Keine externe Bibliothek mehr:** `python-dateutil` wird nicht mehr benötigt. Die Monatsrechnung ist eingebaut, ein fehlender Tag im Zielmonat wird auf den Monatsletzten gesetzt.
 - **Start bei Netzproblemen:** Ein vorübergehender Fehler beim Abruf der Kontoadresse (Netzwerk, Timeout, HTTP 5xx) führt zu einem neuen Versuch statt zu einem dauerhaften Fehler. Eine fehlende E-Mail startet die erneute Anmeldung.
